@@ -1,0 +1,3 @@
+./clipboard.go
+./coredump.go
+./keychain.go

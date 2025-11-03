@@ -1,8 +1,8 @@
 // frontend/src/pages/ViewItem.jsx
 import { useEffect, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
-import { getItem, deleteItem } from "../lib/api";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
+import { deleteItem, getItem } from "../lib/api";
 
 function maskNumber(n) {
   const d = (n || "").replace(/\D/g, "");
@@ -13,29 +13,34 @@ function maskNumber(n) {
 
 export default function ViewItem() {
   const { id } = useParams();
-  const nav = useNavigate();
+  const navigate = useNavigate();
   const [item, setItem] = useState(null);
   const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
+      setLoading(true);
+      setErr("");
       try {
-        setErr("");
         const it = await getItem(id);
-        setItem(it);
+        if (!cancelled) setItem(it);
       } catch (e) {
-        setErr(e.message || "Failed to load");
+        if (!cancelled) setErr(e?.message || "Failed to load item.");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   async function onDelete() {
-    try {
-      await deleteItem(id);
-      nav("/vault");
-    } catch (e) {
-      setErr(e.message || "Failed to delete");
-    }
+    if (!window.confirm("Delete this item?")) return;
+    await deleteItem(id);
+    navigate("/vault");
   }
 
   const tRaw = (item?.type || "").toLowerCase();
@@ -43,64 +48,113 @@ export default function ViewItem() {
   const isNote = tRaw === "note" || tRaw === "secure note" || tRaw === "secure-note";
   const f = item?.fields || {};
 
-  const iconBtn = {
-    border: "1px solid #444",
-    background: "transparent",
-    color: "inherit",
-    padding: "4px 10px",
-    borderRadius: 8,
-    cursor: "pointer",
-  };
+  const title =
+    (isCard && "Card") || (isNote && "Secure note") || "Login item";
 
   return (
     <Layout>
-      {err && <div style={{ color: "#f55" }}>{err}</div>}
-      {!item ? (
-        <div>Loading…</div>
-      ) : (
-        <div style={{ maxWidth: 640 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-            <button aria-label="Back" title="Back" style={iconBtn} onClick={() => nav(-1)}>
-              ←
-            </button>
-            <h1 style={{ margin: 0 }}>{isCard ? "Card" : isNote ? "Secure Note" : "Item"}</h1>
+      <section className="glass-card section" style={{ maxWidth: 720 }}>
+        <div className="section-header">
+          <div>
+            <h1 className="section-title">{title}</h1>
+            <p className="section-subtitle">
+              {item?.fields?.site || item?.fields?.title || item?.fields?.name || "Protected entry"}
+            </p>
           </div>
-
-          {isCard ? (
-            <table>
-              <tbody>
-                <tr><td>Cardholder</td><td>{f.cardholder || "—"}</td></tr>
-                <tr><td>Number</td><td>{maskNumber(f.number)}</td></tr>
-                <tr><td>Expiry</td><td>{(f.exp_month || "—")}/{(f.exp_year || "—")}</td></tr>
-                <tr><td>CVV</td><td>{"•••"}</td></tr>
-                <tr><td>Network</td><td>{f.network || "—"}</td></tr>
-                <tr><td>Notes</td><td>{f.notes || "—"}</td></tr>
-              </tbody>
-            </table>
-          ) : isNote ? (
-            <table>
-              <tbody>
-                <tr><td>Title</td><td>{f.site || f.title || f.name || "—"}</td></tr>
-                <tr><td>Notes</td><td>{f.notes || "—"}</td></tr>
-              </tbody>
-            </table>
-          ) : (
-            <table>
-              <tbody>
-                <tr><td>Site / Title</td><td>{f.site || f.title || f.name || "—"}</td></tr>
-                <tr><td>Username</td><td>{f.username || f.user || "—"}</td></tr>
-                <tr><td>Password</td><td>{"••••••••"}</td></tr>
-                <tr><td>Notes</td><td>{f.notes || "—"}</td></tr>
-              </tbody>
-            </table>
-          )}
-
-          <div style={{ marginTop: 12 }}>
-            <Link to={`/items/${id}/edit`}><button>Edit</button></Link>{" "}
-            <button onClick={onDelete}>Delete</button>
-          </div>
+          <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)}>
+            <span aria-hidden="true">←</span>
+            Back
+          </button>
         </div>
-      )}
+
+        {err && (
+          <div className="message message--error" role="alert">
+            <span aria-hidden="true">⚠️</span>
+            {err}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="message message--info">
+            <span aria-hidden="true">⏳</span>
+            Unlocking item…
+          </div>
+        ) : (
+          <>
+            <table className="table-like">
+              <tbody>
+                {isCard ? (
+                  <>
+                    <tr>
+                      <td>Cardholder</td>
+                      <td>{f.cardholder || "—"}</td>
+                    </tr>
+                    <tr>
+                      <td>Number</td>
+                      <td>{maskNumber(f.number)}</td>
+                    </tr>
+                    <tr>
+                      <td>Expiry</td>
+                      <td>
+                        {(f.exp_month || "—")}/{f.exp_year || "—"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Network</td>
+                      <td>{f.network || "—"}</td>
+                    </tr>
+                    <tr>
+                      <td>Notes</td>
+                      <td>{f.notes || "—"}</td>
+                    </tr>
+                  </>
+                ) : isNote ? (
+                  <>
+                    <tr>
+                      <td>Title</td>
+                      <td>{f.site || f.title || f.name || "—"}</td>
+                    </tr>
+                    <tr>
+                      <td>Notes</td>
+                      <td>{f.notes || "—"}</td>
+                    </tr>
+                  </>
+                ) : (
+                  <>
+                    <tr>
+                      <td>Site / Title</td>
+                      <td>{f.site || f.title || f.name || "—"}</td>
+                    </tr>
+                    <tr>
+                      <td>Username</td>
+                      <td>{f.username || f.user || "—"}</td>
+                    </tr>
+                    <tr>
+                      <td>Password</td>
+                      <td>••••••••</td>
+                    </tr>
+                    <tr>
+                      <td>Notes</td>
+                      <td>{f.notes || "—"}</td>
+                    </tr>
+                  </>
+                )}
+              </tbody>
+            </table>
+
+            <div className="split-actions">
+              <Link to={`/items/${id}/edit`} className="btn btn-primary">
+                <span aria-hidden="true">✏️</span>
+                Edit
+              </Link>
+              <button type="button" className="btn btn-danger" onClick={onDelete}>
+                <span aria-hidden="true">🗑</span>
+                Delete
+              </button>
+            </div>
+          </>
+        )}
+      </section>
     </Layout>
   );
 }

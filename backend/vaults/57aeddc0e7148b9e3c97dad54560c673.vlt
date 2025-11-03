@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "kdf": {
+    "algo": "argon2id",
+    "m": 1048576,
+    "t": 3,
+    "p": 4,
+    "salt": "zf9UlFv8BEfYaZgZRmFuq0a4ddUgNas5Cp8UhZS1T6c="
+  },
+  "vrk_wrap": "rQcEBUIa6Mc57keMJJvJ2trGNQ6Q1nTGQHkmiw9Wb03uqWcTa2WuEyzbgd2DVuqTNYc6e6SM3z7NbU13vX94pjHnC5/ezolQ",
+  "kd_cipher": "cmZQeCixBoK24z8v/jdYn81WadBq/QlbKbcqweCA8QYBM396oh+8n9YsnunXgHfByL16/psQJrr5FYNcyj5SDeUG4s1xaZfHWXlZB376iC08adlyRWpi17HIZLuAn2WaCxNj20E7qUNKK7QKdwl436xxiSlnrNGY0QppBwnLZt1pm/QoNWYKX0Qqwkof0b0XM9EIuYwqSSNSEE956ZX5JlAvSkzemw3cTwVRbB+C2vSD+bf7vPNSNKAeXYsoy95xyS823w=="
+}

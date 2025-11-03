@@ -115,7 +115,7 @@ func main() {
 // ============ Helper Functions ============
 
 func usage() {
-	fmt.Println(`vaultctl commands:
+	fmt.Print(`vaultctl commands:
 
   create  --vault path [--mongo URI --db vaultdb --coll blobs]
   add     --vault path --site example.com --user alice --pass gen:20 [--mongo URI --db vaultdb --coll blobs]

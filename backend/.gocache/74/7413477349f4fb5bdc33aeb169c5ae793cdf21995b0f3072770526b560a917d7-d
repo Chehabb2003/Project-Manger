@@ -1,0 +1,5 @@
+./file_format.go
+./items.go
+./policy.go
+./storage.go
+./vault.go

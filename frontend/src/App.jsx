@@ -5,17 +5,21 @@ import Vault from "./pages/Vault.jsx";
 import ViewItem from "./pages/ViewItem.jsx";
 import EditItem from "./pages/EditItem.jsx";
 import NewItem from "./pages/NewItem.jsx";
+import ChangePassword from "./pages/ChangePassword.jsx";
+import ResetPassword from "./pages/ResetPassword.jsx";
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/unlock" replace />} />
       <Route path="/unlock" element={<Unlock />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/vault" element={<Vault />} />
+      <Route path="/settings/password" element={<ChangePassword />} />
       <Route path="/items/new" element={<NewItem />} />
       <Route path="/items/:id" element={<ViewItem />} />
       <Route path="/items/:id/edit" element={<EditItem />} />
-      <Route path="*" element={<div style={{ padding: 24 }}>Not Found</div>} />
+      <Route path="*" element={<div className="glass-card empty-state">Nothing to see here.</div>} />
     </Routes>
   );
 }

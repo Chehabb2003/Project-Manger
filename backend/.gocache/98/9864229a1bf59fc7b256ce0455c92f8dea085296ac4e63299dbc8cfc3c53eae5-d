@@ -1,0 +1,2 @@
+./fuzz_aead_test.go
+./fuzz_vault_test.go

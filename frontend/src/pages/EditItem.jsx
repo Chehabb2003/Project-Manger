@@ -15,31 +15,37 @@ export default function EditItem() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    let cancel = false;
+    let cancelled = false;
     (async () => {
       setErr("");
       setLoading(true);
       try {
         const it = await getItem(id);
-        if (!cancel) {
+        if (!cancelled) {
           setInitial({
             type: (it?.type || "login").toLowerCase(),
             fields: it?.fields || {},
           });
         }
       } catch (e) {
-        if (!cancel) setErr(e?.message || "Failed to load item");
+        if (!cancelled) {
+          setErr(e?.message || "Failed to load item.");
+        }
       } finally {
-        if (!cancel) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     })();
-    return () => { cancel = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   async function handleSubmit(payload) {
     await updateItem(id, payload);
     setSaved(true);
-    setTimeout(() => setSaved(false), 1500); // stay on page
+    setTimeout(() => setSaved(false), 1800);
   }
 
   async function handleDelete() {
@@ -52,37 +58,50 @@ export default function EditItem() {
     navigate(-1);
   }
 
-  const iconBtn = {
-    border: "1px solid #444",
-    background: "transparent",
-    color: "inherit",
-    padding: "4px 10px",
-    borderRadius: 8,
-    cursor: "pointer",
-  };
-
   return (
     <Layout>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-        <button aria-label="Back" title="Back" style={iconBtn} onClick={() => navigate(-1)}>
-          ←
-        </button>
-        <h1 style={{ margin: 0 }}>Edit Item</h1>
-        {saved && <span style={{ marginLeft: 12, color: "#79d279", fontWeight: 600 }}>Saved ✓</span>}
-      </div>
+      <section className="glass-card section" style={{ maxWidth: 720 }}>
+        <div className="section-header">
+          <div>
+            <h1 className="section-title">Edit item</h1>
+            <p className="section-subtitle">
+              Update secrets, adjust metadata, or archive sensitive information securely.
+            </p>
+          </div>
+          <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)}>
+            <span aria-hidden="true">←</span>
+            Back
+          </button>
+        </div>
 
-      {err && <div style={{ color: "crimson", marginBottom: 8 }}>{err}</div>}
-      {loading ? (
-        <div>Loading…</div>
-      ) : (
-        <ItemForm
-          initial={initial}
-          onSubmit={handleSubmit}
-          onCancel={handleCancel}
-          onDelete={handleDelete}
-          submitLabel="Save"
-        />
-      )}
+        {saved && (
+          <div className="message message--success" role="status">
+            <span aria-hidden="true">💾</span>
+            Saved to vault.
+          </div>
+        )}
+        {err && (
+          <div className="message message--error" role="alert">
+            <span aria-hidden="true">⚠️</span>
+            {err}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="message message--info">
+            <span aria-hidden="true">⏳</span>
+            Retrieving encrypted item…
+          </div>
+        ) : (
+          <ItemForm
+            initial={initial}
+            onSubmit={handleSubmit}
+            onCancel={handleCancel}
+            onDelete={handleDelete}
+            submitLabel="Save changes"
+          />
+        )}
+      </section>
     </Layout>
   );
 }

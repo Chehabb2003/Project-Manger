@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "kdf": {
+    "algo": "argon2id",
+    "m": 1048576,
+    "t": 3,
+    "p": 4,
+    "salt": "ONzHkynm49N3i8sxyjnKM0xDHgHhxCwgCK8A5Z4Os94="
+  },
+  "vrk_wrap": "C+ka+JcnVHhhKHLH1lrSfFgUKRRg6hVztvIP4QwGr/9rogEyLmZsn3uyUPLAk+7fQHuan7QU/1DKoE0ZpsANGkB+oU9qNhIi",
+  "kd_cipher": "uxxUXLxbCsa+LMeQpgwdyreDpp/maq5EJuG8kMFGjDMOxeHSeqjRbdBYa7GpX8Sq2EmGEF2IBRhcbW/NBVM+bIxqWu7S7huw1vh+SenBH19UdixI1ZIPuzjaTxwpFI00SNlZIlPbOXDaX3V+0rLid0lKRtqrT2/Ql/112o6gPTHixeqfT/y+v4TqdsRmBrL2bpxUShJDOSaGBKK6gtJd1Hrpdz3KA7VxDNmWH2HvdHRTbYiPjzr5j9NfpoXUtQuV6xztUVVAfs5MwCOgqMGHkvq34u+qYFfiWKFp6a/jxLe0TnYoMmLHKX3GezyjprLHbNshSaQm9JkQhDe5HlBqJ4eZwODD7F2OoDIzGELmBSRUOILs6o5E7BPcV+iGxju8uBu070/hg5lmIcINfCURxgHy3iPM05WdsaDwFSiRJrThLTFy269jmTc="
+}

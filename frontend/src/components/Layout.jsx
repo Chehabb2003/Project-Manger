@@ -11,22 +11,37 @@ export default function Layout({ children }) {
   const nav = useNavigate();
   const loc = useLocation();
 
-  async function probe() {
-    try {
-      const s = await getSession();
-      setIsUnlocked(!!s.unlocked);
-      setVaultName(s.vault || "");
-      try { localStorage.setItem("vaultName", s.vault || ""); } catch {}
-    } catch {
-      setIsUnlocked(false);
-    }
-  }
-
-  useEffect(() => { probe(); }, [loc.pathname]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const s = await getSession();
+        if (cancelled) return;
+        setIsUnlocked(!!s.unlocked);
+        setVaultName(s.vault || "");
+        try {
+          localStorage.setItem("vaultName", s.vault || "");
+        } catch {
+          /* ignore */
+        }
+      } catch {
+        if (!cancelled) {
+          setIsUnlocked(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loc.pathname]);
 
   async function onLockUnlock() {
     if (isUnlocked) {
-      try { await apiLock(); } catch {}
+      try {
+        await apiLock();
+      } catch {
+        /* ignore lock errors */
+      }
       setIsUnlocked(false);
       nav("/unlock");
     } else {
@@ -34,33 +49,52 @@ export default function Layout({ children }) {
     }
   }
 
-  const headerBtn = {
-    padding: "10px 16px",
-    borderRadius: 10,
-    border: "1px solid #444",
-    background: "transparent",
-    color: "inherit",
-    cursor: "pointer",
-  };
+  const vaultLabel = vaultName ? `Vault · ${vaultName}` : "Vault locked";
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
-      <header style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 12 }}>
-        <Link to="/vault" style={{ textDecoration: "none", color: "inherit", fontWeight: 700 }}>
-          <span role="img" aria-label="lock">🔒</span> <span>Vault</span>
+    <div className="app-shell">
+      <header className="app-header">
+        <Link to="/vault" className="brand">
+          <span className="brand-icon" aria-hidden="true">🔐</span>
+          <span className="brand-text">
+            <strong>VaultCraft</strong>
+            <span>Secure password vault</span>
+          </span>
         </Link>
-        <div style={{ opacity: 0.7 }}>{vaultName ? `Vault: ${vaultName}` : ""}</div>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
+
+        <div className="header-actions">
+          <span className="vault-chip">
+            <span aria-hidden="true">📁</span>
+            {vaultLabel}
+          </span>
+
           {isUnlocked && (
-            <Link to="/items/new"><button style={headerBtn}>+ Add Item</button></Link>
+            <Link to="/items/new" className="btn btn-primary">
+              <span aria-hidden="true">＋</span>
+              New Item
+            </Link>
           )}
-          <button style={headerBtn} onClick={onLockUnlock}>
-            {isUnlocked ? "Lock" : "Unlock"}
+
+          {isUnlocked && (
+            <Link to="/settings/password" className="btn btn-ghost">
+              <span aria-hidden="true">🛡</span>
+              Security
+            </Link>
+          )}
+
+          <button type="button" className="btn btn-ghost" onClick={onLockUnlock}>
+            <span aria-hidden="true">{isUnlocked ? "🔒" : "🔓"}</span>
+            {isUnlocked ? "Lock Vault" : "Unlock"}
           </button>
         </div>
       </header>
-      <hr style={{ borderColor: "#333" }} />
-      <main>{children}</main>
+
+      <main className="app-main">{children}</main>
+
+      <footer className="app-footer">
+        <span>VaultCraft · crafted for effortless security</span>
+        <span>Stay encrypted · Stay serene</span>
+      </footer>
     </div>
   );
 }
