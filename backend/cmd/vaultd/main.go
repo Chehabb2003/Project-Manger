@@ -274,14 +274,11 @@ func (s *server) handleItems(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) handleItemByID(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URLPath, "/api/items/") // r.URL.Path in older Go
+	// Always use r.URL.Path
+	id := strings.TrimPrefix(r.URL.Path, "/api/items/")
 	if id == "" || id == "/" {
 		http.NotFound(w, r)
 		return
-	}
-	// Fix for older Go versions:
-	if id == r.URL.Path { // if URLPath isn't supported
-		id = strings.TrimPrefix(r.URL.Path, "/api/items/")
 	}
 
 	s.mu.Lock()
@@ -324,6 +321,7 @@ func (s *server) handleItemByID(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
+
 
 func writeJSON(w http.ResponseWriter, v any) { writeJSONStatus(w, http.StatusOK, v) }
 func writeJSONStatus(w http.ResponseWriter, code int, v any) {
