@@ -63,10 +63,10 @@ export default function Layout({ children }) {
         </Link>
 
         <div className="header-actions">
-          <span className="vault-chip">
+          {/* <span className="vault-chip">
             <span aria-hidden="true">📁</span>
             {vaultLabel}
-          </span>
+          </span> */}
 
           {isUnlocked && (
             <Link to="/items/new" className="btn btn-primary">

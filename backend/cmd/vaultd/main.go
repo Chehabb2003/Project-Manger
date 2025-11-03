@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/big"
 	"net"
 	"net/http"
 	"net/smtp"
@@ -39,6 +41,7 @@ type server struct {
 	mu          sync.Mutex
 	sessions    map[string]*userSession
 	resetTokens map[string]resetToken
+	pending2FA  map[string]*twoFAChallenge
 	mailer      mailConfig
 
 	// mongo config (defaults; per-user collections are derived dynamically)
@@ -62,6 +65,15 @@ type userSession struct {
 type resetToken struct {
 	Username string
 	Email    string
+	Expires  time.Time
+}
+
+type twoFAChallenge struct {
+	Username string
+	Email    string
+	Roles    []auth.Role
+	Password string
+	Code     string
 	Expires  time.Time
 }
 
@@ -120,7 +132,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func main() {
 	// make logs visible and include file:line
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	_ = godotenv.Load()
+	_ = godotenv.Load(".env", "backend/.env")
 	port := flag.String("port", "8080", "HTTP port to listen on")
 	mongoURI := flag.String("mongo", "", "MongoDB URI (or use MONGODB_URI env, or default)")
 	mongoDB := flag.String("db", "vaultdb", "MongoDB database name")
@@ -143,6 +155,7 @@ func main() {
 		mongoBlob:   *mongoBlob,
 		sessions:    make(map[string]*userSession),
 		resetTokens: make(map[string]resetToken),
+		pending2FA:  make(map[string]*twoFAChallenge),
 	}
 	s.mailer = loadMailConfig()
 
@@ -175,6 +188,7 @@ func (s *server) routes() {
 
 	// Auth (public)
 	s.mux.HandleFunc("/api/login", s.handleLogin)
+	s.mux.HandleFunc("/api/login/verify", s.handleLoginVerify)
 	s.mux.HandleFunc("/api/signup", s.handleSignup)
 	s.mux.HandleFunc("/api/password/forgot", s.handleForgotPassword)
 	s.mux.HandleFunc("/api/password/reset", s.handleResetPassword)
@@ -279,7 +293,7 @@ func loadMailConfig() mailConfig {
 	if user == "" || pass == "" {
 		log.Printf("[mailer] SMTP_USER or SMTP_PASS missing; attempting unauthenticated SMTP to %s:%s", host, port)
 	}
-	return mailConfig{
+	cfg := mailConfig{
 		Host:     host,
 		Port:     port,
 		User:     user,
@@ -288,6 +302,8 @@ func loadMailConfig() mailConfig {
 		enabled:  true,
 		security: security,
 	}
+	log.Printf("[mailer] configured host=%s port=%s security=%s user=%s", host, port, security, maskForLog(user))
+	return cfg
 }
 
 // ---- helpers ----
@@ -343,6 +359,16 @@ func validatePassword(pw string) error {
 		return errors.New("password must include a special character")
 	}
 	return nil
+}
+
+func maskForLog(s string) string {
+	if s == "" {
+		return "(none)"
+	}
+	if len(s) <= 2 {
+		return "***"
+	}
+	return s[:1] + "***" + s[len(s)-1:]
 }
 
 func isValidEmail(email string) bool {
@@ -405,6 +431,17 @@ type resetPasswordReq struct {
 
 type resetPasswordResp struct {
 	Note string `json:"note"`
+}
+
+type twoFAChallengeResp struct {
+	ChallengeID string    `json:"challenge_id"`
+	ExpiresAt   time.Time `json:"expires_at"`
+	Note        string    `json:"note"`
+}
+
+type loginVerifyReq struct {
+	ChallengeID string `json:"challenge_id"`
+	Code        string `json:"code"`
 }
 
 // ---- handlers: signup/login ----
@@ -556,47 +593,147 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// per-user collections
-	metaColl, blobColl := userCollections(u.Username)
-	log.Printf("[login] using collections: %s / %s\n", metaColl, blobColl)
+	if strings.TrimSpace(u.Email) == "" {
+		http.Error(w, "user email missing; cannot send 2FA", http.StatusConflict)
+		return
+	}
 
-	// per-user vault (create on first login if missing)
-	vpath := userVaultPath(u.Username)
-	blobs, err := storage.NewMongoBlobStore(r.Context(), s.mongoURI, s.mongoDB, blobColl)
+	code, err := generateSixDigitCode()
 	if err != nil {
-		http.Error(w, "mongo blobs: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "2fa code generation failed", http.StatusInternalServerError)
 		return
 	}
-	meta, err := storage.NewMongoMetaStore(r.Context(), s.mongoURI, s.mongoDB, metaColl)
+	challengeID, err := generateResetToken()
 	if err != nil {
-		http.Error(w, "mongo meta: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "challenge generation failed", http.StatusInternalServerError)
 		return
 	}
+	expires := time.Now().Add(3 * time.Minute)
+
+	s.mu.Lock()
+	for id, ch := range s.pending2FA {
+		if ch.Username == u.Username {
+			delete(s.pending2FA, id)
+		}
+	}
+	s.pending2FA[challengeID] = &twoFAChallenge{
+		Username: u.Username,
+		Email:    u.Email,
+		Roles:    u.Roles,
+		Password: req.Password,
+		Code:     code,
+		Expires:  expires,
+	}
+	s.mu.Unlock()
+
+	if err := s.sendTwoFACode(u.Email, code, expires); err != nil {
+		s.mu.Lock()
+		delete(s.pending2FA, challengeID)
+		s.mu.Unlock()
+		http.Error(w, "failed to dispatch 2fa code", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, twoFAChallengeResp{
+		ChallengeID: challengeID,
+		ExpiresAt:   expires,
+		Note:        "Two-factor code sent to your email address.",
+	})
+}
+
+func (s *server) handleLoginVerify(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req loginVerifyReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad json", http.StatusBadRequest)
+		return
+	}
+
+	challengeID := strings.TrimSpace(req.ChallengeID)
+	code := strings.TrimSpace(req.Code)
+	if challengeID == "" || code == "" {
+		http.Error(w, "challenge id and code required", http.StatusBadRequest)
+		return
+	}
+
+	var challenge *twoFAChallenge
+	s.mu.Lock()
+	if ch, ok := s.pending2FA[challengeID]; ok {
+		if time.Now().After(ch.Expires) {
+			delete(s.pending2FA, challengeID)
+		} else {
+			challenge = ch
+		}
+	}
+	s.mu.Unlock()
+
+	if challenge == nil {
+		http.Error(w, "invalid or expired challenge", http.StatusUnauthorized)
+		return
+	}
+
+	if subtle.ConstantTimeCompare([]byte(challenge.Code), []byte(code)) != 1 {
+		http.Error(w, "invalid code", http.StatusUnauthorized)
+		return
+	}
+
+	resp, err := s.completeLogin(r.Context(), challenge.Username, challenge.Password, challenge.Roles)
+	if err != nil {
+		s.mu.Lock()
+		delete(s.pending2FA, challengeID)
+		s.mu.Unlock()
+		log.Printf("[2fa] complete login failed for %s: %v", challenge.Username, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	s.mu.Lock()
+	delete(s.pending2FA, challengeID)
+	s.mu.Unlock()
+
+	writeJSON(w, resp)
+}
+
+func (s *server) completeLogin(ctx context.Context, username, password string, roles []auth.Role) (loginResp, error) {
+	metaColl, blobColl := userCollections(username)
+	log.Printf("[login] using collections: %s / %s", metaColl, blobColl)
+
+	blobs, err := storage.NewMongoBlobStore(ctx, s.mongoURI, s.mongoDB, blobColl)
+	if err != nil {
+		return loginResp{}, fmt.Errorf("mongo blobs: %w", err)
+	}
+	meta, err := storage.NewMongoMetaStore(ctx, s.mongoURI, s.mongoDB, metaColl)
+	if err != nil {
+		return loginResp{}, fmt.Errorf("mongo meta: %w", err)
+	}
+
+	vpath := userVaultPath(username)
 	v := vault.NewWithStores(vpath, blobs, meta)
 
 	if _, statErr := os.Stat(vpath); errors.Is(statErr, os.ErrNotExist) {
-		if err := v.Create(r.Context(), []byte(req.Password)); err != nil {
-			http.Error(w, "create vault: "+err.Error(), http.StatusBadRequest)
-			return
+		if err := v.Create(ctx, []byte(password)); err != nil {
+			return loginResp{}, fmt.Errorf("create vault: %w", err)
 		}
 	} else {
-		if err := v.Unlock(r.Context(), []byte(req.Password)); err != nil {
-			http.Error(w, "unlock: "+err.Error(), http.StatusUnauthorized)
-			return
+		if err := v.Unlock(ctx, []byte(password)); err != nil {
+			return loginResp{}, fmt.Errorf("unlock: %w", err)
 		}
 	}
 
-	// token & session
-	tok, exp, err := s.signer.IssueToken(u.Username, u.Roles)
+	tok, exp, err := s.signer.IssueToken(username, roles)
 	if err != nil {
-		http.Error(w, "token issue failed", http.StatusInternalServerError)
-		return
+		return loginResp{}, fmt.Errorf("token issue failed: %w", err)
 	}
+
 	s.mu.Lock()
-	s.sessions[u.Username] = &userSession{v: v, vpath: vpath, unlocked: true}
+	s.sessions[username] = &userSession{v: v, vpath: vpath, unlocked: true}
 	s.mu.Unlock()
 
-	writeJSON(w, loginResp{Token: tok, ExpiresAt: exp, Vault: path.Base(vpath)})
+	return loginResp{Token: tok, ExpiresAt: exp, Vault: path.Base(vpath)}, nil
 }
 
 func (s *server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
@@ -854,6 +991,28 @@ func generateResetToken() (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
+func generateSixDigitCode() (string, error) {
+	max := big.NewInt(1_000_000)
+	n, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%06d", n.Int64()), nil
+}
+
+func (s *server) sendTwoFACode(email, code string, exp time.Time) error {
+	if !s.mailer.enabled {
+		return errors.New("mailer disabled")
+	}
+	body := fmt.Sprintf("Your VaultCraft verification code is %s.\n\nIt expires at %s.\n\nIf you did not request this sign-in, please secure your account immediately.", code, exp.Format(time.RFC1123Z))
+	if err := s.sendEmail(email, "Your VaultCraft verification code", body); err != nil {
+		return err
+	}
+	addr := net.JoinHostPort(s.mailer.Host, s.mailer.Port)
+	log.Printf("[2fa] sent code to %s via %s (expires %s)", email, addr, exp.Format(time.RFC3339))
+	return nil
+}
+
 func (s *server) sendResetEmail(email, token string, exp time.Time) {
 	base := strings.TrimRight(getenvDefault("APP_BASE_URL", "http://localhost:5173"), "/")
 	link := fmt.Sprintf("%s/reset-password?token=%s", base, token)
@@ -862,88 +1021,75 @@ func (s *server) sendResetEmail(email, token string, exp time.Time) {
 		log.Printf("[reset-email] (mailer disabled) to %s (expires %s): %s", email, exp.Format(time.RFC3339), link)
 		return
 	}
-
+	body := fmt.Sprintf("Hi,\n\nUse the link below to reset your Project Vault password.\n\n%s\n\nThe link expires at %s. If you didn't request this, you can ignore this message.", link, exp.Format(time.RFC1123Z))
+	if err := s.sendEmail(email, "Reset your vault password", body); err != nil {
+		addr := net.JoinHostPort(s.mailer.Host, s.mailer.Port)
+		log.Printf("[reset-email] send failed via %s: %v (link: %s)", addr, err, link)
+		return
+	}
 	addr := net.JoinHostPort(s.mailer.Host, s.mailer.Port)
-	body := fmt.Sprintf("To: %s\r\nFrom: %s\r\nSubject: Reset your vault password\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nHi,\n\nUse the link below to reset your Project Vault password.\n\n%s\n\nThe link expires at %s. If you didn't request this, you can ignore this message.\n", email, s.mailer.From, link, exp.Format(time.RFC1123Z))
+	log.Printf("[reset-email] sent to %s via %s (expires %s)", email, addr, exp.Format(time.RFC3339))
+}
 
-	send := func(client *smtp.Client) error {
+func (s *server) sendEmail(to, subject, body string) error {
+	addr := net.JoinHostPort(s.mailer.Host, s.mailer.Port)
+	normalizedBody := strings.ReplaceAll(body, "\n", "\r\n")
+	msg := []byte(fmt.Sprintf(
+		"To: %s\r\n"+
+			"From: %s\r\n"+
+			"Subject: %s\r\n"+
+			"MIME-Version: 1.0\r\n"+
+			"Content-Type: text/plain; charset=utf-8\r\n"+
+			"\r\n"+
+			"%s\r\n",
+		to, s.mailer.From, subject, normalizedBody,
+	))
+
+	var auth smtp.Auth
+	if s.mailer.User != "" && s.mailer.Pass != "" {
+		auth = smtp.PlainAuth("", s.mailer.User, s.mailer.Pass, s.mailer.Host)
+	}
+
+	switch strings.ToLower(s.mailer.security) {
+	case "implicit", "ssl":
+		tlsCfg := &tls.Config{ServerName: s.mailer.Host}
+		conn, err := tls.Dial("tcp", addr, tlsCfg)
+		if err != nil {
+			return err
+		}
+		client, err := smtp.NewClient(conn, s.mailer.Host)
+		if err != nil {
+			conn.Close()
+			return err
+		}
 		defer client.Close()
-		if s.mailer.User != "" && s.mailer.Pass != "" {
-			auth := smtp.PlainAuth("", s.mailer.User, s.mailer.Pass, s.mailer.Host)
+
+		if auth != nil {
 			if err := client.Auth(auth); err != nil {
-				return fmt.Errorf("auth: %w", err)
+				return err
 			}
 		}
 		if err := client.Mail(s.mailer.From); err != nil {
-			return fmt.Errorf("mail from: %w", err)
+			return err
 		}
-		if err := client.Rcpt(email); err != nil {
-			return fmt.Errorf("rcpt to: %w", err)
+		if err := client.Rcpt(to); err != nil {
+			return err
 		}
-		wc, err := client.Data()
+		w, err := client.Data()
 		if err != nil {
-			return fmt.Errorf("data: %w", err)
+			return err
 		}
-		if _, err := wc.Write([]byte(body)); err != nil {
-			wc.Close()
-			return fmt.Errorf("write: %w", err)
+		if _, err := w.Write(msg); err != nil {
+			w.Close()
+			return err
 		}
-		if err := wc.Close(); err != nil {
-			return fmt.Errorf("close: %w", err)
+		if err := w.Close(); err != nil {
+			return err
 		}
-		if err := client.Quit(); err != nil {
-			return fmt.Errorf("quit: %w", err)
-		}
-		return nil
+		return client.Quit()
+	default:
+		return smtp.SendMail(addr, auth, s.mailer.From, []string{to}, msg)
 	}
-
-	var err error
-	switch s.mailer.security {
-	case "implicit", "ssl":
-		tlsCfg := &tls.Config{ServerName: s.mailer.Host}
-		conn, dialErr := tls.Dial("tcp", addr, tlsCfg)
-		if dialErr != nil {
-			err = fmt.Errorf("dial tls: %w", dialErr)
-			break
-		}
-		client, cliErr := smtp.NewClient(conn, s.mailer.Host)
-		if cliErr != nil {
-			conn.Close()
-			err = fmt.Errorf("smtp client: %w", cliErr)
-			break
-		}
-		err = send(client)
-	case "none":
-		var client *smtp.Client
-		client, err = smtp.Dial(addr)
-		if err == nil {
-			err = send(client)
-		}
-	default: // starttls
-		var client *smtp.Client
-		client, err = smtp.Dial(addr)
-		if err == nil {
-			if ok, _ := client.Extension("STARTTLS"); ok {
-				tlsCfg := &tls.Config{ServerName: s.mailer.Host}
-				if tlsErr := client.StartTLS(tlsCfg); tlsErr != nil {
-					client.Close()
-					err = fmt.Errorf("starttls: %w", tlsErr)
-				} else {
-					err = send(client)
-				}
-			} else {
-				client.Close()
-				err = fmt.Errorf("server does not support STARTTLS")
-			}
-		}
-	}
-
-	if err != nil {
-		log.Printf("[reset-email] send failed via %s using %s: %v (link: %s)", addr, s.mailer.security, err, link)
-		return
-	}
-
-	log.Printf("[reset-email] sent to %s via %s (expires %s)", email, addr, exp.Format(time.RFC3339))
 }
 
 func (s *server) nukeUserVault(ctx context.Context, username string) error {

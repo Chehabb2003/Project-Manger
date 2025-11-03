@@ -17,6 +17,7 @@ export default function ViewItem() {
   const [item, setItem] = useState(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,7 +132,19 @@ export default function ViewItem() {
                     </tr>
                     <tr>
                       <td>Password</td>
-                      <td>••••••••</td>
+                      <td>
+                        <div className="password-display">
+                          <span>{showPassword ? f.password || "—" : "••••••••"}</span>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-chip"
+                            onClick={() => setShowPassword((prev) => !prev)}
+                            aria-label={showPassword ? "Hide password" : "Show password"}
+                          >
+                            {showPassword ? "🙈 Hide" : "👁 Reveal"}
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                     <tr>
                       <td>Notes</td>

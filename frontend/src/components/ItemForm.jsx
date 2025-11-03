@@ -36,6 +36,7 @@ export default function ItemForm({
   const [notes, setNotes] = useState(initial.fields?.notes || "");
   const [username, setUsername] = useState(initial.fields?.username || initial.fields?.user || "");
   const [password, setPassword] = useState(initial.fields?.password || "");
+  const [showPassword, setShowPassword] = useState(false);
   const [cardholder, setCardholder] = useState(initial.fields?.cardholder || "");
   const [cardNumber, setCardNumber] = useState(initial.fields?.number || "");
   const [expMonth, setExpMonth] = useState(initial.fields?.exp_month || "");
@@ -137,14 +138,24 @@ export default function ItemForm({
               <label className="input-label" htmlFor="item-password">
                 Password
               </label>
-              <input
-                id="item-password"
-                className="input"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-              />
+              <div className="input-with-toggle">
+                <input
+                  id="item-password"
+                  className="input"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  className="input-toggle"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? "🙈" : "👁"}
+                </button>
+              </div>
             </div>
           </div>
         </>

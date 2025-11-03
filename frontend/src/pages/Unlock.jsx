@@ -1,7 +1,7 @@
 // src/pages/Unlock.jsx — Authentication landing
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { login, signup, requestPasswordReset } from "../lib/api";
+import { login, signup, requestPasswordReset, verifyLogin } from "../lib/api";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -29,6 +29,8 @@ export default function Unlock() {
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loginChallenge, setLoginChallenge] = useState(null);
+  const [twoFACode, setTwoFACode] = useState("");
 
   const navigate = useNavigate();
 
@@ -43,6 +45,8 @@ export default function Unlock() {
     setPwErr("");
     setMsg("");
     setErr("");
+    setLoginChallenge(null);
+    setTwoFACode("");
   }
 
   async function onSubmit(e) {
@@ -55,14 +59,43 @@ export default function Unlock() {
     try {
       setBusy(true);
       if (mode === "login") {
+        if (loginChallenge) {
+          const pin = twoFACode.trim();
+          if (!pin) {
+            setErr("Enter the six-digit verification code.");
+            return;
+          }
+          const res = await verifyLogin(loginChallenge.challenge_id, pin);
+          if (res?.token) {
+            setMsg("Success! Unlocking your vault…");
+            setLoginChallenge(null);
+            setTwoFACode("");
+            setPassword("");
+            setIdentifier("");
+            setTimeout(() => navigate("/vault"), 300);
+          } else {
+            setErr("Unexpected server response.");
+          }
+          return;
+        }
+
         const ident = identifier.trim();
         if (!ident || !password) {
           setErr("Please enter your username/email and password.");
           return;
         }
-        await login(ident, password);
-        setMsg("Welcome back! Redirecting to your vault…");
-        setTimeout(() => navigate("/vault"), 400);
+
+        const data = await login(ident, password);
+        if (data?.token) {
+          setMsg("Welcome back! Redirecting to your vault…");
+          setTimeout(() => navigate("/vault"), 400);
+        } else if (data?.challenge_id) {
+          setLoginChallenge(data);
+          setTwoFACode("");
+          setMsg(data?.note || "We just emailed you a verification code.");
+        } else {
+          setErr("Unexpected server response.");
+        }
         return;
       }
 
@@ -102,6 +135,10 @@ export default function Unlock() {
       setMsg(res?.note || "If the account exists, we just sent a reset link.");
     } catch (e2) {
       setErr(e2?.message ? `Oops — ${e2.message}` : "Something went wrong.");
+      if (mode === "login" && !loginChallenge) {
+        setLoginChallenge(null);
+        setTwoFACode("");
+      }
     } finally {
       setBusy(false);
     }
@@ -173,36 +210,59 @@ export default function Unlock() {
           )}
 
           <form className="auth-form" onSubmit={onSubmit}>
-            {mode === "login" && (
-              <>
-                <div className="form-field">
-                  <label className="input-label" htmlFor="auth-identifier">
-                    Username or Email
-                  </label>
-                  <input
-                    id="auth-identifier"
-                    className="input"
-                    placeholder="you@example.com"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    autoComplete="username"
-                  />
-                </div>
-                <div className="form-field">
-                  <label className="input-label" htmlFor="auth-password">
-                    Password
-                  </label>
-                  <input
-                    id="auth-password"
-                    className="input"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="current-password"
-                  />
-                </div>
-              </>
+        {mode === "login" && (
+          <>
+            <div className="form-field">
+              <label className="input-label" htmlFor="auth-identifier">
+                Username or Email
+              </label>
+              <input
+                id="auth-identifier"
+                className="input"
+                placeholder="you@example.com"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                autoComplete="username"
+                disabled={!!loginChallenge}
+              />
+            </div>
+            <div className="form-field">
+              <label className="input-label" htmlFor="auth-password">
+                Password
+              </label>
+              <input
+                id="auth-password"
+                className="input"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                disabled={!!loginChallenge}
+              />
+            </div>
+          </>
+        )}
+
+        {mode === "login" && loginChallenge && (
+          <div className="form-field">
+            <label className="input-label" htmlFor="twofa-code">
+              Verification code
+            </label>
+            <input
+              id="twofa-code"
+              className="input"
+              placeholder="Enter the 6-digit code"
+              value={twoFACode}
+              onChange={(e) => setTwoFACode(e.target.value)}
+              inputMode="numeric"
+            />
+            {loginChallenge.expires_at && (
+              <p className="helper-text">
+                Code expires at {new Date(loginChallenge.expires_at).toLocaleTimeString()}.
+              </p>
             )}
+          </div>
+        )}
 
             {mode === "signup" && (
               <>
@@ -291,7 +351,9 @@ export default function Unlock() {
                 : mode === "signup"
                 ? "Create your vault"
                 : mode === "login"
-                ? "Unlock vault"
+                ? loginChallenge
+                  ? "Verify code"
+                  : "Unlock vault"
                 : "Send reset email"}
             </button>
           </form>

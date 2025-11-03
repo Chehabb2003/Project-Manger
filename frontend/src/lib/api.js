@@ -88,12 +88,21 @@ export async function resetPassword(token, next) {
   return req('/password/reset', { method: 'POST', body: { token, next } });
 }
 
+export async function verifyLogin(challengeId, code) {
+  const data = await req('/login/verify', { method: 'POST', body: { challenge_id: challengeId, code } });
+  if (data && data.token && typeof localStorage !== 'undefined') {
+    localStorage.setItem('token', data.token);
+  }
+  return data;
+}
+
 const api = {
   login,
   signup,
   changePassword,
   requestPasswordReset,
   resetPassword,
+  verifyLogin,
   session,
   unlock,
   lock,

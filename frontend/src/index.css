@@ -302,6 +302,51 @@ button {
   min-height: 132px;
 }
 
+.input-with-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-toggle .input {
+  padding-right: 46px;
+}
+
+.input-toggle {
+  position: absolute;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: rgba(244, 246, 255, 0.7);
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.input-toggle:hover {
+  color: #ffffff;
+  transform: scale(1.05);
+}
+
+.input-toggle:focus-visible {
+  outline: 2px solid rgba(124, 93, 250, 0.45);
+  border-radius: 8px;
+}
+
+.password-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.password-display span {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  letter-spacing: 0.08em;
+}
+
 .form-card {
   display: flex;
   flex-direction: column;
