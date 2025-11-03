@@ -1,97 +1,106 @@
-// src/pages/ViewItem.jsx
+// frontend/src/pages/ViewItem.jsx
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { deleteItem, getItem } from "../lib/api";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { getItem, deleteItem } from "../lib/api";
+import Layout from "../components/Layout.jsx";
 
-function ViewItem() {
+function maskNumber(n) {
+  const d = (n || "").replace(/\D/g, "");
+  if (!d) return "—";
+  const l4 = d.slice(-4);
+  return `•••• •••• •••• ${l4}`;
+}
+
+export default function ViewItem() {
   const { id } = useParams();
-  const navigate = useNavigate();
+  const nav = useNavigate();
   const [item, setItem] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    let cancel = false;
     (async () => {
-      setErr("");
-      setLoading(true);
       try {
-        const res = await getItem(id);
-        if (!cancel) setItem(res);
+        setErr("");
+        const it = await getItem(id);
+        setItem(it);
       } catch (e) {
-        if (!cancel) setErr(e.message || "Failed to load item");
-      } finally {
-        if (!cancel) setLoading(false);
+        setErr(e.message || "Failed to load");
       }
     })();
-    return () => { cancel = true; };
   }, [id]);
 
   async function onDelete() {
-    if (!confirm("Delete this item?")) return;
     try {
       await deleteItem(id);
-      navigate("/vault");
+      nav("/vault");
     } catch (e) {
-      alert(e.message || "Failed to delete");
+      setErr(e.message || "Failed to delete");
     }
   }
 
-  function copy(text) {
-    navigator.clipboard.writeText(text || "");
-  }
+  const tRaw = (item?.type || "").toLowerCase();
+  const isCard = tRaw === "card";
+  const isNote = tRaw === "note" || tRaw === "secure note" || tRaw === "secure-note";
+  const f = item?.fields || {};
 
-  if (loading) return <div className="container" style={{ maxWidth: 720, margin: "24px auto" }}>Loading…</div>;
-  if (err) return <div className="container" style={{ maxWidth: 720, margin: "24px auto", color: "crimson" }}>{err}</div>;
-  if (!item) return null;
-
-  const f = item.fields || {};
+  const iconBtn = {
+    border: "1px solid #444",
+    background: "transparent",
+    color: "inherit",
+    padding: "4px 10px",
+    borderRadius: 8,
+    cursor: "pointer",
+  };
 
   return (
-    <div className="container" style={{ maxWidth: 720, margin: "24px auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <h1 style={{ flex: 1, margin: 0 }}>{f.site || f.title || "(untitled)"}</h1>
-        <Link to={`/items/${id}/edit`}><button>Edit</button></Link>
-        <button onClick={onDelete} style={{ background: "#f33", color: "white" }}>Delete</button>
-      </div>
-
-      <div style={{ marginTop: 16, display: "grid", gap: 8 }}>
-        {f.username && (
-          <Field label="Username" value={f.username} onCopy={() => copy(f.username)} />
-        )}
-        {f.password && (
-          <Field label="Password" masked value={f.password} onCopy={() => copy(f.password)} />
-        )}
-        {f.notes && (
-          <div>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>Notes</div>
-            <pre style={{ whiteSpace: "pre-wrap", background: "#fafafa", padding: 12, border: "1px solid #eee" }}>
-              {f.notes}
-            </pre>
+    <Layout>
+      {err && <div style={{ color: "#f55" }}>{err}</div>}
+      {!item ? (
+        <div>Loading…</div>
+      ) : (
+        <div style={{ maxWidth: 640 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+            <button aria-label="Back" title="Back" style={iconBtn} onClick={() => nav(-1)}>
+              ←
+            </button>
+            <h1 style={{ margin: 0 }}>{isCard ? "Card" : isNote ? "Secure Note" : "Item"}</h1>
           </div>
-        )}
-      </div>
-    </div>
+
+          {isCard ? (
+            <table>
+              <tbody>
+                <tr><td>Cardholder</td><td>{f.cardholder || "—"}</td></tr>
+                <tr><td>Number</td><td>{maskNumber(f.number)}</td></tr>
+                <tr><td>Expiry</td><td>{(f.exp_month || "—")}/{(f.exp_year || "—")}</td></tr>
+                <tr><td>CVV</td><td>{"•••"}</td></tr>
+                <tr><td>Network</td><td>{f.network || "—"}</td></tr>
+                <tr><td>Notes</td><td>{f.notes || "—"}</td></tr>
+              </tbody>
+            </table>
+          ) : isNote ? (
+            <table>
+              <tbody>
+                <tr><td>Title</td><td>{f.site || f.title || f.name || "—"}</td></tr>
+                <tr><td>Notes</td><td>{f.notes || "—"}</td></tr>
+              </tbody>
+            </table>
+          ) : (
+            <table>
+              <tbody>
+                <tr><td>Site / Title</td><td>{f.site || f.title || f.name || "—"}</td></tr>
+                <tr><td>Username</td><td>{f.username || f.user || "—"}</td></tr>
+                <tr><td>Password</td><td>{"••••••••"}</td></tr>
+                <tr><td>Notes</td><td>{f.notes || "—"}</td></tr>
+              </tbody>
+            </table>
+          )}
+
+          <div style={{ marginTop: 12 }}>
+            <Link to={`/items/${id}/edit`}><button>Edit</button></Link>{" "}
+            <button onClick={onDelete}>Delete</button>
+          </div>
+        </div>
+      )}
+    </Layout>
   );
 }
-
-function Field({ label, value, masked, onCopy }) {
-  const [show, setShow] = useState(false);
-  return (
-    <div style={{ display: "grid", gap: 4 }}>
-      <div style={{ fontWeight: 600 }}>{label}</div>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <input
-          readOnly
-          type={masked && !show ? "password" : "text"}
-          value={value}
-          style={{ flex: 1 }}
-        />
-        {masked && <button onClick={() => setShow(s => !s)}>{show ? "Hide" : "Show"}</button>}
-        <button onClick={onCopy}>Copy</button>
-      </div>
-    </div>
-  );
-}
-
-export default ViewItem;

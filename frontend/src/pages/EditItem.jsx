@@ -1,36 +1,30 @@
+// frontend/src/pages/EditItem.jsx
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import ItemForm from "../components/ItemForm.jsx";
-import { createItem, getItem, updateItem } from "../lib/api";
+import { getItem, updateItem, deleteItem } from "../lib/api";
 
 export default function EditItem() {
-  const { id } = useParams();              // undefined for /items/new
-  const isEdit = !!id;                     // edit when /items/:id/edit
+  const { id } = useParams();
   const navigate = useNavigate();
 
   const [initial, setInitial] = useState({ type: "login", fields: {} });
-  const [loading, setLoading] = useState(isEdit);
+  const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [saved, setSaved] = useState(false);
 
-  // Load existing item if editing
   useEffect(() => {
-    if (!isEdit) return;
     let cancel = false;
     (async () => {
-      setLoading(true);
       setErr("");
+      setLoading(true);
       try {
         const it = await getItem(id);
         if (!cancel) {
           setInitial({
-            type: it?.type || "login",
-            fields: {
-              site: it?.fields?.site || it?.fields?.title || "",
-              username: it?.fields?.username || "",
-              password: it?.fields?.password || "",
-              notes: it?.fields?.notes || "",
-            },
+            type: (it?.type || "login").toLowerCase(),
+            fields: it?.fields || {},
           });
         }
       } catch (e) {
@@ -40,26 +34,43 @@ export default function EditItem() {
       }
     })();
     return () => { cancel = true; };
-  }, [id, isEdit]);
+  }, [id]);
 
   async function handleSubmit(payload) {
-    if (isEdit) {
-      await updateItem(id, payload);
-      navigate(`/items/${id}`);
-    } else {
-      const created = await createItem(payload);
-      const newId = created?.id ?? created; // support either {id} or raw id
-      navigate(`/items/${newId}`);
-    }
+    await updateItem(id, payload);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500); // stay on page
+  }
+
+  async function handleDelete() {
+    if (!window.confirm("Delete this item?")) return;
+    await deleteItem(id);
+    navigate("/vault");
   }
 
   function handleCancel() {
-    navigate(isEdit ? `/items/${id}` : "/vault");
+    navigate(-1);
   }
+
+  const iconBtn = {
+    border: "1px solid #444",
+    background: "transparent",
+    color: "inherit",
+    padding: "4px 10px",
+    borderRadius: 8,
+    cursor: "pointer",
+  };
 
   return (
     <Layout>
-      <h1 style={{ marginTop: 0 }}>{isEdit ? "Edit Item" : "New Item"}</h1>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <button aria-label="Back" title="Back" style={iconBtn} onClick={() => navigate(-1)}>
+          ←
+        </button>
+        <h1 style={{ margin: 0 }}>Edit Item</h1>
+        {saved && <span style={{ marginLeft: 12, color: "#79d279", fontWeight: 600 }}>Saved ✓</span>}
+      </div>
+
       {err && <div style={{ color: "crimson", marginBottom: 8 }}>{err}</div>}
       {loading ? (
         <div>Loading…</div>
@@ -68,7 +79,8 @@ export default function EditItem() {
           initial={initial}
           onSubmit={handleSubmit}
           onCancel={handleCancel}
-          submitLabel={isEdit ? "Save" : "Create"}
+          onDelete={handleDelete}
+          submitLabel="Save"
         />
       )}
     </Layout>

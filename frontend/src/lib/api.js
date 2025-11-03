@@ -1,18 +1,31 @@
-// src/lib/api.js
+// frontend/src/lib/api.js
 const BASE = "/api";
 
 async function req(path, { method = "GET", body, headers } = {}) {
-  const res = await fetch(`${BASE}${path}`, {
+  const init = {
     method,
-    headers: { "Content-Type": "application/json", ...(headers || {}) },
-    body: body ? JSON.stringify(body) : undefined,
+    headers: { ...(headers || {}) },
     credentials: "include",
-  });
-  if (!res.ok) throw new Error(`${res.status} ${await res.text().catch(() => "")}`);
+  };
+  if (body !== undefined) {
+    init.headers["Content-Type"] = "application/json";
+    init.body = JSON.stringify(body);
+  }
+  const res = await fetch(`${BASE}${path}`, init);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `${res.status} ${text?.trim() || res.statusText || "Request failed"}`
+    );
+  }
+  if (res.status === 204) return {};
   const ct = res.headers.get("content-type") || "";
   return ct.includes("application/json") ? res.json() : {};
 }
 
+export function session() {
+  return req("/session");
+}
 export function unlock(vault, master) {
   return req("/unlock", { method: "POST", body: { vault, master } });
 }
@@ -22,7 +35,7 @@ export function lock() {
 export async function listItems(params = {}) {
   const qs = new URLSearchParams(params);
   const data = await req(`/items${qs.toString() ? `?${qs}` : ""}`);
-  return Array.isArray(data) ? { items: data } : (data || { items: [] });
+  return Array.isArray(data) ? { items: data } : data || { items: [] };
 }
 export function getItem(id) {
   return req(`/items/${id}`);
@@ -37,6 +50,14 @@ export function deleteItem(id) {
   return req(`/items/${id}`, { method: "DELETE" });
 }
 
-// (optional) also export a default object if you like
-const api = { unlock, lock, listItems, getItem, createItem, updateItem, deleteItem };
+const api = {
+  session,
+  unlock,
+  lock,
+  listItems,
+  getItem,
+  createItem,
+  updateItem,
+  deleteItem,
+};
 export default api;

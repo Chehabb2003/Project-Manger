@@ -1,53 +1,66 @@
-import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import { lock } from "../lib/api";
+// frontend/src/components/Layout.jsx
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { session as getSession, lock as apiLock } from "../lib/api";
 
 export default function Layout({ children }) {
-  const { isUnlocked, setUnlocked } = useAuth();
-  const navigate = useNavigate();
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [vaultName, setVaultName] = useState(
+    typeof localStorage !== "undefined" ? localStorage.getItem("vaultName") || "" : ""
+  );
+  const nav = useNavigate();
+  const loc = useLocation();
 
-  async function onLock() {
+  async function probe() {
     try {
-      await lock();
+      const s = await getSession();
+      setIsUnlocked(!!s.unlocked);
+      setVaultName(s.vault || "");
+      try { localStorage.setItem("vaultName", s.vault || ""); } catch {}
     } catch {
-      // ignore; best-effort
-    } finally {
-      setUnlocked(null);
-      navigate("/unlock");
+      setIsUnlocked(false);
     }
   }
 
-  return (
-    <div>
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "12px 16px",
-          borderBottom: "1px solid #eee",
-        }}
-      >
-        <Link to={isUnlocked?.ok ? "/vault" : "/unlock"} style={{ textDecoration: "none" }}>
-          <h2 style={{ margin: 0 }}>🔐 Vault</h2>
-        </Link>
+  useEffect(() => { probe(); }, [loc.pathname]);
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-          {isUnlocked?.ok ? (
-            <>
-              <span style={{ opacity: 0.7 }}>Vault: <code>{isUnlocked.vault}</code></span>
-              <Link to="/items/new"><button>+ Add Item</button></Link>
-              <button onClick={onLock} title="Lock vault">Lock</button>
-            </>
-          ) : (
-            <Link to="/unlock"><button>Unlock</button></Link>
+  async function onLockUnlock() {
+    if (isUnlocked) {
+      try { await apiLock(); } catch {}
+      setIsUnlocked(false);
+      nav("/unlock");
+    } else {
+      nav("/unlock");
+    }
+  }
+
+  const headerBtn = {
+    padding: "10px 16px",
+    borderRadius: 10,
+    border: "1px solid #444",
+    background: "transparent",
+    color: "inherit",
+    cursor: "pointer",
+  };
+
+  return (
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
+      <header style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 12 }}>
+        <Link to="/vault" style={{ textDecoration: "none", color: "inherit", fontWeight: 700 }}>
+          <span role="img" aria-label="lock">🔒</span> <span>Vault</span>
+        </Link>
+        <div style={{ opacity: 0.7 }}>{vaultName ? `Vault: ${vaultName}` : ""}</div>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
+          {isUnlocked && (
+            <Link to="/items/new"><button style={headerBtn}>+ Add Item</button></Link>
           )}
+          <button style={headerBtn} onClick={onLockUnlock}>
+            {isUnlocked ? "Lock" : "Unlock"}
+          </button>
         </div>
       </header>
-
-      <main style={{ maxWidth: 1000, margin: "20px auto", padding: "0 16px" }}>
-        {children}
-      </main>
+      <hr style={{ borderColor: "#333" }} />
+      <main>{children}</main>
     </div>
   );
 }
