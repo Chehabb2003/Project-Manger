@@ -65,27 +65,27 @@ func (s *Server) handleUnlock(w http.ResponseWriter, r *http.Request) {
 	defer cr.Zero(master)
 
 	metaColl, blobColl := collectionNames(claims.Sub)
-    var blobs storage.BlobStore
-    var err error
-    if s.storageClient != nil {
-        blobs, err = storage.NewMongoBlobStoreWithClient(s.storageClient, s.cfg.MongoDB, blobColl)
-    } else {
-        blobs, err = storage.NewMongoBlobStore(r.Context(), s.cfg.MongoURI, s.cfg.MongoDB, blobColl)
-    }
-    if err != nil {
-        http.Error(w, "mongo blobs: "+err.Error(), http.StatusInternalServerError)
-        return
-    }
-    var meta *storage.MongoMetaStore
-    if s.storageClient != nil {
-        meta, err = storage.NewMongoMetaStoreWithClient(s.storageClient, s.cfg.MongoDB, metaColl)
-    } else {
-        meta, err = storage.NewMongoMetaStore(r.Context(), s.cfg.MongoURI, s.cfg.MongoDB, metaColl)
-    }
-    if err != nil {
-        http.Error(w, "mongo meta: "+err.Error(), http.StatusInternalServerError)
-        return
-    }
+	var blobs storage.BlobStore
+	var err error
+	if s.storageClient != nil {
+		blobs, err = storage.NewMongoBlobStoreWithClient(s.storageClient, s.cfg.MongoDB, blobColl)
+	} else {
+		blobs, err = storage.NewMongoBlobStore(r.Context(), s.cfg.MongoURI, s.cfg.MongoDB, blobColl)
+	}
+	if err != nil {
+		http.Error(w, "mongo blobs: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var meta *storage.MongoMetaStore
+	if s.storageClient != nil {
+		meta, err = storage.NewMongoMetaStoreWithClient(s.storageClient, s.cfg.MongoDB, metaColl)
+	} else {
+		meta, err = storage.NewMongoMetaStore(r.Context(), s.cfg.MongoURI, s.cfg.MongoDB, metaColl)
+	}
+	if err != nil {
+		http.Error(w, "mongo meta: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	vpath := s.vaultPath(claims.Sub)
 	v := vault.NewWithStores(vpath, blobs, meta)

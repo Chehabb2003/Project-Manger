@@ -23,7 +23,7 @@ func writeHeader(path string, h Header) error {
 	if err != nil {
 		return err
 	}
-	// TODO: padding / atomic write temp+rename
+
 	return os.WriteFile(path, b, 0600)
 }
 

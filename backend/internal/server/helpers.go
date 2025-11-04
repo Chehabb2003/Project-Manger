@@ -25,10 +25,10 @@ func writeJSONStatus(w http.ResponseWriter, code int, v any) {
 }
 
 func tooMany(w http.ResponseWriter, retryAfterSeconds int) {
-    if retryAfterSeconds > 0 {
-        w.Header().Set("Retry-After", strconv.Itoa(retryAfterSeconds))
-    }
-    http.Error(w, "too many requests", http.StatusTooManyRequests)
+	if retryAfterSeconds > 0 {
+		w.Header().Set("Retry-After", strconv.Itoa(retryAfterSeconds))
+	}
+	http.Error(w, "too many requests", http.StatusTooManyRequests)
 }
 
 var (
@@ -64,12 +64,12 @@ func isValidEmail(email string) bool {
 
 func sha256Hex(in string) string {
 	sum := sha256.Sum256([]byte(in))
-	return hex.EncodeToString(sum[:16]) // 32 chars
+	return hex.EncodeToString(sum[:16])
 }
 
 func collectionNames(username string) (meta, blobs string) {
 	sum := sha256.Sum256([]byte(username))
-	short := hex.EncodeToString(sum[:6]) // 12 hex chars
+	short := hex.EncodeToString(sum[:6])
 	return "meta_" + short, "blobs_" + short
 }
 

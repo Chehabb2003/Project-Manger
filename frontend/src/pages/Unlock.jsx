@@ -1,4 +1,3 @@
-// src/pages/Unlock.jsx — Authentication landing
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login, signup, requestPasswordReset, verifyLogin } from "../lib/api";
@@ -162,7 +161,6 @@ export default function Unlock() {
         return;
       }
 
-      // Forgot password
       const mail = email.trim().toLowerCase();
       if (!mail || !emailRegex.test(mail)) {
         setErr("Enter the email address associated with your vault.");
@@ -427,13 +425,6 @@ export default function Unlock() {
                   Copy secret
                 </button>
               </div>
-              {/* {totpSetup.uri && (
-                <p className="helper-text">
-                  Authenticator URI:&nbsp;
-                  <a href={totpSetup.uri}>{totpSetup.uri}</a>
-                </p>
-              )}
-              {copyNote && <p className="helper-text">{copyNote}</p>} */}
               <p className="helper-text">
                 Enter a fresh code from your authenticator above, then click <strong>Verify &amp; unlock</strong> to continue.
               </p>

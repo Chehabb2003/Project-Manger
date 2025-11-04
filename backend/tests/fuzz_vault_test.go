@@ -24,7 +24,6 @@ func TestVaultCreateUnlock(t *testing.T) {
 	}
 	defer v2.Lock()
 
-	// add item
 	_, err := v2.AddItem(context.Background(), vault.Item{
 		Type: "login",
 		Fields: map[string]string{
@@ -37,6 +36,5 @@ func TestVaultCreateUnlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// cleanup
 	_ = os.Remove(path)
 }

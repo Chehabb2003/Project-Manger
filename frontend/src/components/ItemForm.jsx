@@ -1,4 +1,3 @@
-// frontend/src/components/ItemForm.jsx
 import { useMemo, useState } from "react";
 
 function digitsOnly(s) {
@@ -29,7 +28,6 @@ export default function ItemForm({
   submitLabel = "Save",
   onDelete,
 }) {
-  // Force login-only items
   const kind = "login";
 
   const [site, setSite] = useState(initial.fields?.site || initial.fields?.title || "");
@@ -61,7 +59,6 @@ export default function ItemForm({
 
   return (
     <form className="form-card" onSubmit={submit}>
-      {/* Item type removed: login-only */}
 
       <div className="form-field">
         <label className="input-label" htmlFor="item-site">
@@ -117,8 +114,6 @@ export default function ItemForm({
           </div>
         </>
       }
-
-      {/* Card and Secure note inputs removed (login-only) */}
 
       <div className="form-field">
         <label className="input-label" htmlFor="item-notes">

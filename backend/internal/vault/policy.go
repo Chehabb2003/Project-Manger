@@ -1,8 +1,8 @@
 package vault
 
 type Policy struct {
-	LockTimeout      int64 `json:"lock_timeout_ms"`
-	ClipboardTimeout int64 `json:"clipboard_timeout_ms"`
+	LockTimeout      int64  `json:"lock_timeout_ms"`
+	ClipboardTimeout int64  `json:"clipboard_timeout_ms"`
 	RehashTargetM    uint32 `json:"rehash_target_m"`
 	RehashTargetT    uint32 `json:"rehash_target_t"`
 	RehashTargetP    uint8  `json:"rehash_target_p"`

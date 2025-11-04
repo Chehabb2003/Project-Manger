@@ -3,7 +3,7 @@ import { createContext, useContext, useMemo, useState } from "react";
 const AuthCtx = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [isUnlocked, setUnlocked] = useState(null); // { ok: true, vault: 'dev.vlt' } after unlock
+  const [isUnlocked, setUnlocked] = useState(null);
   const value = useMemo(() => ({ isUnlocked, setUnlocked }), [isUnlocked]);
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }

@@ -1,8 +1,5 @@
 package platform
 
-// Stubs: wrap/unwrap device private keys with OS keystore.
-// Provide per-OS implementations later via build tags.
-
 type Keychain interface {
 	Store(keyID string, priv []byte) error
 	Load(keyID string) ([]byte, error)

@@ -29,8 +29,6 @@ var (
 	ErrInvalidMAC         = errors.New("crypto: message authentication failed")
 )
 
-// Seal encrypts using AES-256-GCM with per-message salt-derived keys.
-// Layout: [salt (32) || nonce (12) || ciphertext+tag (16-byte tag appended)].
 func Seal(masterKey, plaintext, aad []byte) ([]byte, error) {
 	if len(masterKey) == 0 {
 		return nil, errors.New("crypto: empty master key")
@@ -76,7 +74,6 @@ func Seal(masterKey, plaintext, aad []byte) ([]byte, error) {
 	return out, nil
 }
 
-// Open decrypts ciphertext produced by Seal.
 func Open(masterKey, ciphertext, aad []byte) ([]byte, error) {
 	if len(ciphertext) < envelopeMinSize {
 		return nil, ErrCiphertextTooShort
@@ -124,8 +121,6 @@ func deriveGCMKey(masterKey, salt []byte) ([]byte, error) {
 	return encKey, nil
 }
 
-// openLegacyCTR decrypts legacy AES-CTR + HMAC sealed blobs. It is retained to
-// support existing data and should not be used for new writes.
 func openLegacyCTR(masterKey, ciphertext, aad []byte) ([]byte, error) {
 	if len(ciphertext) < legacyMinSize {
 		return nil, ErrCiphertextTooShort

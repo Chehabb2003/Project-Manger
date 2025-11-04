@@ -5,10 +5,8 @@ import (
 	"errors"
 )
 
-// Returned by BlobStore.Get/Delete when the id doesn't exist.
 var ErrNotFound = errors.New("blob not found")
 
-// BlobStore is the pluggable storage for encrypted item blobs.
 type BlobStore interface {
 	Put(ctx context.Context, id string, data []byte) error
 	Get(ctx context.Context, id string) ([]byte, error)

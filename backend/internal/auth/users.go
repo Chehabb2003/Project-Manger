@@ -5,11 +5,10 @@ import (
 	"strings"
 )
 
-// Swap this with your real storage (DB, meta store, etc.)
 type User struct {
 	Username   string
 	Email      string
-	PassHash   string // argon2id encoded string
+	PassHash   string
 	Roles      []Role
 	TOTPSecret string
 }

@@ -15,11 +15,11 @@ func (v *vault) AddItem(ctx context.Context, item Item) (string, error) {
 	if !v.unlocked {
 		return "", ErrNotUnlocked
 	}
-    dek := make([]byte, 32)
+	dek := make([]byte, 32)
 	_, _ = rand.Read(dek)
 	defer cr.Zero(dek)
 
-    payload := struct {
+	payload := struct {
 		Type    string            `json:"type"`
 		Fields  map[string]string `json:"fields"`
 		Created int64             `json:"created"`
@@ -40,21 +40,21 @@ func (v *vault) AddItem(ctx context.Context, item Item) (string, error) {
 	if err != nil {
 		return "", err
 	}
-    dekWrap, err := cr.Seal(v.vrk[:], dek, []byte("dek-wrap:"+id))
+	dekWrap, err := cr.Seal(v.vrk[:], dek, []byte("dek-wrap:"+id))
 	if err != nil {
 		return "", err
 	}
 
-    v.kd.Items[id] = KDItem{DekWrap: dekWrap}
+	v.kd.Items[id] = KDItem{DekWrap: dekWrap}
 
-    if v.store == nil {
-        return "", fmt.Errorf("no blob store configured")
-    }
+	if v.store == nil {
+		return "", fmt.Errorf("no blob store configured")
+	}
 	if err := v.store.Put(ctx, id, ct); err != nil {
 		return "", err
 	}
 
-    m := ItemMeta{
+	m := ItemMeta{
 		ID:      id,
 		Type:    item.Type,
 		Created: payload.Created,
@@ -63,7 +63,7 @@ func (v *vault) AddItem(ctx context.Context, item Item) (string, error) {
 	}
 	v.meta[id] = m
 
-    if v.metaStore != nil {
+	if v.metaStore != nil {
 		_ = v.metaStore.PutMeta(ctx, storage.ItemMeta{
 			ID:      m.ID,
 			Type:    m.Type,
@@ -84,7 +84,7 @@ func (v *vault) GetItem(ctx context.Context, id string) (Item, error) {
 	if !ok {
 		return Item{}, fmt.Errorf("item not found: %s", id)
 	}
-    dek, err := cr.OpenAny(v.vrk[:], ki.DekWrap, []byte("dek-wrap:"+id))
+	dek, err := cr.OpenAny(v.vrk[:], ki.DekWrap, []byte("dek-wrap:"+id))
 	if err != nil {
 		return Item{}, err
 	}
@@ -95,7 +95,7 @@ func (v *vault) GetItem(ctx context.Context, id string) (Item, error) {
 		return Item{}, err
 	}
 	aad := []byte("item:" + id)
-    pt, err := cr.OpenAny(v.dekKey(dek), ct, aad)
+	pt, err := cr.OpenAny(v.dekKey(dek), ct, aad)
 	if err != nil {
 		return Item{}, err
 	}
@@ -117,7 +117,7 @@ func (v *vault) UpdateItem(ctx context.Context, id string, upd Item) error {
 	if !ok {
 		return fmt.Errorf("item not found: %s", id)
 	}
-    dek, err := cr.OpenAny(v.vrk[:], ki.DekWrap, []byte("dek-wrap:"+id))
+	dek, err := cr.OpenAny(v.vrk[:], ki.DekWrap, []byte("dek-wrap:"+id))
 	if err != nil {
 		return err
 	}
@@ -152,7 +152,7 @@ func (v *vault) UpdateItem(ctx context.Context, id string, upd Item) error {
 		Updated: payload.Updated,
 		Version: payload.Version,
 	}
-	// optional: also bump remote meta
+
 	if v.metaStore != nil {
 		_ = v.metaStore.PutMeta(ctx, storage.ItemMeta{
 			ID:      id,

@@ -27,7 +27,6 @@ export function session() {
   return req("/session");
 }
 
-// ⬇️ backend expects only { master } now
 export function unlock(master) {
   return req("/unlock", { method: "POST", body: { master } });
 }
@@ -55,7 +54,6 @@ export function deleteItem(id) {
   return req(`/items/${id}`, { method: "DELETE" });
 }
 
-// ⬇️ use req()'s parsed return value; don't call .json() again
 export async function login(identifier, password) {
   const data = await req('/login', { method: 'POST', body: { identifier, password } });
   if (data && data.token && typeof localStorage !== 'undefined') {

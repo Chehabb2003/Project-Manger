@@ -10,7 +10,7 @@ const (
 )
 
 type Claims struct {
-	Sub       string `json:"sub"` // user ID / username
+	Sub       string `json:"sub"`
 	Roles     []Role `json:"roles"`
 	TokenID   string `json:"jti"`
 	IssuedAt  int64  `json:"iat"`
@@ -20,7 +20,7 @@ type Claims struct {
 type LoginRequest struct {
 	Username   string `json:"username"`
 	Identifier string `json:"identifier"`
-	Password string `json:"password"`
+	Password   string `json:"password"`
 }
 
 type LoginResponse struct {

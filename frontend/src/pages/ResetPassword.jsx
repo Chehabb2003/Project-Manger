@@ -89,18 +89,6 @@ export default function ResetPassword() {
         )}
 
         <form className="form-card" onSubmit={onSubmit}>
-          {/* <div className="form-field">
-            <label className="input-label" htmlFor="reset-token">
-              Reset token
-            </label>
-            <input
-              id="reset-token"
-              className="input"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="Paste your reset token"
-            />
-          </div> */}
           <div className="form-field">
             <label className="input-label" htmlFor="reset-password">
               New password

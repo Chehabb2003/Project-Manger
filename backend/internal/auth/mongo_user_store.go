@@ -30,12 +30,11 @@ func NewMongoUserStore(ctx context.Context, uri, db, coll string) (*MongoUserSto
 	if err := cli.Connect(dialCtx); err != nil {
 		return nil, err
 	}
-	// optional ping
+
 	_ = cli.Ping(dialCtx, readpref.Primary())
 
 	c := cli.Database(db).Collection(coll)
 
-	// Ensure unique indexes on username and email
 	_, _ = c.Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys:    bson.D{{Key: "username", Value: 1}},
 		Options: options.Index().SetUnique(true),
@@ -48,7 +47,6 @@ func NewMongoUserStore(ctx context.Context, uri, db, coll string) (*MongoUserSto
 	return &MongoUserStore{cli: cli, coll: c}, nil
 }
 
-// Add inserts a new user. Returns an error if username already exists.
 func (s *MongoUserStore) Add(u *User) error {
 	email := strings.ToLower(strings.TrimSpace(u.Email))
 	u.Email = email
@@ -56,13 +54,13 @@ func (s *MongoUserStore) Add(u *User) error {
 		"username":    u.Username,
 		"email":       email,
 		"pass_hash":   u.PassHash,
-		"roles":       u.Roles, // []Role is []string under the hood
+		"roles":       u.Roles,
 		"totp_secret": strings.TrimSpace(u.TOTPSecret),
 	}
 	_, err := s.coll.InsertOne(context.Background(), doc)
 	if wex, ok := err.(mongo.WriteException); ok {
 		for _, we := range wex.WriteErrors {
-			if we.Code == 11000 { // duplicate key
+			if we.Code == 11000 {
 				return errors.New("username or email already exists")
 			}
 		}
@@ -70,12 +68,10 @@ func (s *MongoUserStore) Add(u *User) error {
 	return err
 }
 
-// FindByUsername loads a user by username.
 func (s *MongoUserStore) FindByUsername(username string) (*User, error) {
 	return s.findOne(bson.M{"username": username})
 }
 
-// FindByEmail loads a user by email.
 func (s *MongoUserStore) FindByEmail(email string) (*User, error) {
 	return s.findOne(bson.M{"email": strings.ToLower(strings.TrimSpace(email))})
 }
@@ -104,7 +100,6 @@ func (s *MongoUserStore) findOne(filter interface{}) (*User, error) {
 	}, nil
 }
 
-// UpdatePassword replaces the stored password hash for a user.
 func (s *MongoUserStore) UpdatePassword(username, newHash string) error {
 	res, err := s.coll.UpdateOne(
 		context.Background(),

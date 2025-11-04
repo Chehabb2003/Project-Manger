@@ -8,7 +8,6 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
-        // no rewrite needed because backend also serves /api/*
       },
     },
   },

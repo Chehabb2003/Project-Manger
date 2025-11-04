@@ -11,11 +11,9 @@ import (
 )
 
 type mongoBlobStore struct {
-    client *mongo.Client
-    coll   *mongo.Collection
+	client *mongo.Client
+	coll   *mongo.Collection
 }
-
-// ---------- BLOB STORE (ciphertext blobs) ----------
 
 func NewMongoBlobStore(ctx context.Context, uri, dbName, collName string) (BlobStore, error) {
 	if uri == "" {
@@ -25,7 +23,7 @@ func NewMongoBlobStore(ctx context.Context, uri, dbName, collName string) (BlobS
 	if err != nil {
 		return nil, err
 	}
-	// Verify connection quickly
+
 	pctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	if err := cli.Ping(pctx, nil); err != nil {
@@ -35,7 +33,6 @@ func NewMongoBlobStore(ctx context.Context, uri, dbName, collName string) (BlobS
 
 	coll := cli.Database(dbName).Collection(collName)
 
-	// Ensure a unique index on _id
 	_, _ = coll.Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys:    bson.D{{Key: "_id", Value: 1}},
 		Options: options.Index().SetUnique(true),
@@ -44,13 +41,12 @@ func NewMongoBlobStore(ctx context.Context, uri, dbName, collName string) (BlobS
 	return &mongoBlobStore{client: cli, coll: coll}, nil
 }
 
-// NewMongoBlobStoreWithClient reuses an existing mongo.Client.
 func NewMongoBlobStoreWithClient(cli *mongo.Client, dbName, collName string) (BlobStore, error) {
-    if cli == nil {
-        return nil, errors.New("mongo client is nil")
-    }
-    coll := cli.Database(dbName).Collection(collName)
-    return &mongoBlobStore{client: cli, coll: coll}, nil
+	if cli == nil {
+		return nil, errors.New("mongo client is nil")
+	}
+	coll := cli.Database(dbName).Collection(collName)
+	return &mongoBlobStore{client: cli, coll: coll}, nil
 }
 
 func (m *mongoBlobStore) Put(ctx context.Context, id string, data []byte) error {
@@ -100,9 +96,6 @@ func (m *mongoBlobStore) Close(ctx context.Context) error {
 	return m.client.Disconnect(ctx)
 }
 
-// ---------- META STORE (ItemMeta index) ----------
-
-// Local copy to avoid import cycles with the vault package.
 type ItemMeta struct {
 	ID      string `bson:"id" json:"id"`
 	Type    string `bson:"type" json:"type"`
@@ -129,7 +122,7 @@ func NewMongoMetaStore(ctx context.Context, uri, dbName, collName string) (*Mong
 	if err != nil {
 		return nil, err
 	}
-	// Verify connection quickly
+
 	pctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	if err := cli.Ping(pctx, nil); err != nil {
@@ -139,7 +132,6 @@ func NewMongoMetaStore(ctx context.Context, uri, dbName, collName string) (*Mong
 
 	coll := cli.Database(dbName).Collection(collName)
 
-	// Helpful index on id (not _id) since we store item id under "id"
 	_, _ = coll.Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys:    bson.D{{Key: "id", Value: 1}},
 		Options: options.Index().SetUnique(true),
@@ -148,20 +140,19 @@ func NewMongoMetaStore(ctx context.Context, uri, dbName, collName string) (*Mong
 	return &MongoMetaStore{client: cli, coll: coll}, nil
 }
 
-// NewMongoMetaStoreWithClient reuses an existing mongo.Client.
 func NewMongoMetaStoreWithClient(cli *mongo.Client, dbName, collName string) (*MongoMetaStore, error) {
-    if cli == nil {
-        return nil, errors.New("mongo client is nil")
-    }
-    coll := cli.Database(dbName).Collection(collName)
-    return &MongoMetaStore{client: cli, coll: coll}, nil
+	if cli == nil {
+		return nil, errors.New("mongo client is nil")
+	}
+	coll := cli.Database(dbName).Collection(collName)
+	return &MongoMetaStore{client: cli, coll: coll}, nil
 }
 
 func (m *MongoMetaStore) PutMeta(ctx context.Context, meta ItemMeta) error {
 	if meta.ID == "" {
 		return errors.New("empty meta.id")
 	}
-	// Upsert by logical id (not Mongo _id) so re-adds update metadata
+
 	_, err := m.coll.UpdateOne(
 		ctx,
 		bson.M{"id": meta.ID},

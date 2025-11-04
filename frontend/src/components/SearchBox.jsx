@@ -1,4 +1,3 @@
-// src/components/SearchBox.jsx
 import { useEffect, useState } from "react";
 
 function SearchBox({ defaultValue = "", onChange, placeholder = "Search…" }) {

@@ -198,7 +198,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		identifier = strings.TrimSpace(req.Username)
 	}
 
-	// Rate limit by IP and identifier
 	ip := getClientIP(r)
 	if !s.rlLoginIP.allow(ip) {
 		tooMany(w, 60)
@@ -210,26 +209,25 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-    var user *auth.User
-    var err error
-    if identifier != "" {
-        user, err = s.users.FindByUsername(identifier)
-        if err != nil {
-            user, err = s.users.FindByEmail(identifier)
-        }
-    } else {
-        err = errors.New("identifier missing")
-    }
-    if err != nil {
-        http.Error(w, "invalid credentials", http.StatusUnauthorized)
-        return
-    }
+	var user *auth.User
+	var err error
+	if identifier != "" {
+		user, err = s.users.FindByUsername(identifier)
+		if err != nil {
+			user, err = s.users.FindByEmail(identifier)
+		}
+	} else {
+		err = errors.New("identifier missing")
+	}
+	if err != nil {
+		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		return
+	}
 
-    // Also rate limit by canonical username to prevent alias bypass (email vs username)
-    if !s.rlLoginID.allow(strings.ToLower(user.Username)) {
-        tooMany(w, 60)
-        return
-    }
+	if !s.rlLoginID.allow(strings.ToLower(user.Username)) {
+		tooMany(w, 60)
+		return
+	}
 
 	ok, err := auth.VerifyPassword(req.Password, user.PassHash)
 	if err != nil || !ok {
@@ -295,7 +293,6 @@ func (s *Server) handleLoginVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Rate limit by IP and challenge id
 	ip := getClientIP(r)
 	if !s.rlTotpIP.allow(ip) {
 		tooMany(w, 30)
@@ -323,23 +320,22 @@ func (s *Server) handleLoginVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-    user, err := s.users.FindByUsername(challenge.Username)
-    if err != nil {
-        s.clearChallenge(challengeID)
-        http.Error(w, "invalid challenge", http.StatusUnauthorized)
-        return
-    }
+	user, err := s.users.FindByUsername(challenge.Username)
+	if err != nil {
+		s.clearChallenge(challengeID)
+		http.Error(w, "invalid challenge", http.StatusUnauthorized)
+		return
+	}
 
-    // Also rate limit TOTP by username
-    if !s.rlTotpUser.allow(strings.ToLower(user.Username)) {
-        tooMany(w, 30)
-        return
-    }
+	if !s.rlTotpUser.allow(strings.ToLower(user.Username)) {
+		tooMany(w, 30)
+		return
+	}
 
-    if !totp.Verify(code, user.TOTPSecret, time.Now().UTC()) {
-        http.Error(w, "invalid code", http.StatusUnauthorized)
-        return
-    }
+	if !totp.Verify(code, user.TOTPSecret, time.Now().UTC()) {
+		http.Error(w, "invalid code", http.StatusUnauthorized)
+		return
+	}
 
 	resp, err := s.completeLogin(r.Context(), challenge.Username, challenge.Master, challenge.Roles)
 	if err != nil {
@@ -382,25 +378,25 @@ func shouldResetVault(err error) bool {
 func (s *Server) completeLogin(ctx context.Context, username string, master []byte, roles []auth.Role) (loginResp, error) {
 	metaColl, blobColl := collectionNames(username)
 
-    var blobs storage.BlobStore
-    var err error
-    if s.storageClient != nil {
-        blobs, err = storage.NewMongoBlobStoreWithClient(s.storageClient, s.cfg.MongoDB, blobColl)
-    } else {
-        blobs, err = storage.NewMongoBlobStore(ctx, s.cfg.MongoURI, s.cfg.MongoDB, blobColl)
-    }
-    if err != nil {
-        return loginResp{}, fmt.Errorf("mongo blobs: %w", err)
-    }
-    var meta *storage.MongoMetaStore
-    if s.storageClient != nil {
-        meta, err = storage.NewMongoMetaStoreWithClient(s.storageClient, s.cfg.MongoDB, metaColl)
-    } else {
-        meta, err = storage.NewMongoMetaStore(ctx, s.cfg.MongoURI, s.cfg.MongoDB, metaColl)
-    }
-    if err != nil {
-        return loginResp{}, fmt.Errorf("mongo meta: %w", err)
-    }
+	var blobs storage.BlobStore
+	var err error
+	if s.storageClient != nil {
+		blobs, err = storage.NewMongoBlobStoreWithClient(s.storageClient, s.cfg.MongoDB, blobColl)
+	} else {
+		blobs, err = storage.NewMongoBlobStore(ctx, s.cfg.MongoURI, s.cfg.MongoDB, blobColl)
+	}
+	if err != nil {
+		return loginResp{}, fmt.Errorf("mongo blobs: %w", err)
+	}
+	var meta *storage.MongoMetaStore
+	if s.storageClient != nil {
+		meta, err = storage.NewMongoMetaStoreWithClient(s.storageClient, s.cfg.MongoDB, metaColl)
+	} else {
+		meta, err = storage.NewMongoMetaStore(ctx, s.cfg.MongoURI, s.cfg.MongoDB, metaColl)
+	}
+	if err != nil {
+		return loginResp{}, fmt.Errorf("mongo meta: %w", err)
+	}
 
 	vpath := s.vaultPath(username)
 	v := vault.NewWithStores(vpath, blobs, meta)
@@ -459,7 +455,6 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Rate limit by IP and identifier (email/username)
 	ip := getClientIP(r)
 	if !s.rlForgotIP.allow(ip) {
 		tooMany(w, 300)
@@ -535,21 +530,20 @@ func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "token and next password required", http.StatusBadRequest)
 		return
 	}
-		if err := validatePassword(next); err != nil {
-			http.Error(w, "weak password: "+err.Error(), http.StatusBadRequest)
-			return
-		}
+	if err := validatePassword(next); err != nil {
+		http.Error(w, "weak password: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
-		// Rate limit by IP and reset token
-		ip := getClientIP(r)
-		if !s.rlResetIP.allow(ip) {
-			tooMany(w, 300)
-			return
-		}
-		if !s.rlResetToken.allow(token) {
-			tooMany(w, 300)
-			return
-		}
+	ip := getClientIP(r)
+	if !s.rlResetIP.allow(ip) {
+		tooMany(w, 300)
+		return
+	}
+	if !s.rlResetToken.allow(token) {
+		tooMany(w, 300)
+		return
+	}
 
 	s.mu.Lock()
 	info, ok := s.resets[token]
@@ -649,27 +643,27 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	if sess == nil {
 		metaColl, blobColl := collectionNames(claims.Sub)
-    var blobs storage.BlobStore
-    var err error
-    if s.storageClient != nil {
-        blobs, err = storage.NewMongoBlobStoreWithClient(s.storageClient, s.cfg.MongoDB, blobColl)
-    } else {
-        blobs, err = storage.NewMongoBlobStore(ctx, s.cfg.MongoURI, s.cfg.MongoDB, blobColl)
-    }
-    if err != nil {
-        http.Error(w, "mongo blobs: "+err.Error(), http.StatusInternalServerError)
-        return
-    }
-    var meta *storage.MongoMetaStore
-    if s.storageClient != nil {
-        meta, err = storage.NewMongoMetaStoreWithClient(s.storageClient, s.cfg.MongoDB, metaColl)
-    } else {
-        meta, err = storage.NewMongoMetaStore(ctx, s.cfg.MongoURI, s.cfg.MongoDB, metaColl)
-    }
-    if err != nil {
-        http.Error(w, "mongo meta: "+err.Error(), http.StatusInternalServerError)
-        return
-    }
+		var blobs storage.BlobStore
+		var err error
+		if s.storageClient != nil {
+			blobs, err = storage.NewMongoBlobStoreWithClient(s.storageClient, s.cfg.MongoDB, blobColl)
+		} else {
+			blobs, err = storage.NewMongoBlobStore(ctx, s.cfg.MongoURI, s.cfg.MongoDB, blobColl)
+		}
+		if err != nil {
+			http.Error(w, "mongo blobs: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		var meta *storage.MongoMetaStore
+		if s.storageClient != nil {
+			meta, err = storage.NewMongoMetaStoreWithClient(s.storageClient, s.cfg.MongoDB, metaColl)
+		} else {
+			meta, err = storage.NewMongoMetaStore(ctx, s.cfg.MongoURI, s.cfg.MongoDB, metaColl)
+		}
+		if err != nil {
+			http.Error(w, "mongo meta: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 		vpath := s.vaultPath(claims.Sub)
 		v := vault.NewWithStores(vpath, blobs, meta)
 		if err := v.Unlock(ctx, masterCurrent); err != nil {

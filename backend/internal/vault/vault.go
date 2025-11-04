@@ -33,22 +33,17 @@ type vault struct {
 	kek [32]byte
 	vrk [32]byte
 
-	// explicit stores
 	store     storage.BlobStore
 	metaStore storage.MetaStore
 
-	// local meta cache (for local-only mode and quick lookups)
 	meta map[string]ItemMeta
 }
 
-// New uses a local file-backed blob store next to the vault file
-// e.g., main.vlt -> .main.vlt.blobs/
 func New(path string) Vault {
 	blobDir := "." + filepath.Base(path) + ".blobs"
 	return NewWithStores(path, storage.NewFileBlobStore(blobDir), nil)
 }
 
-// NewWithStores lets you inject BlobStore (e.g., Mongo/file) and MetaStore (optional)
 func NewWithStores(path string, blobs storage.BlobStore, meta storage.MetaStore) Vault {
 	return &vault{
 		path:      path,
@@ -71,17 +66,14 @@ func (v *vault) Create(ctx context.Context, master []byte) error {
 	v.kek = cr.DeriveKEK(master, kdf)
 	defer zero32(&v.kek)
 
-	// create VRK
-	_, _ = rand.Read(v.vrk[:]) // or crypto/rand.Read; RandRead is fine if you have it
+	_, _ = rand.Read(v.vrk[:])
 
-	// wrap VRK with KEK
 	vrkWrap, err := cr.Seal(v.kek[:], v.vrk[:], []byte("vrk-wrap"))
 	if err != nil {
 		return err
 	}
 	v.header.VRKWrap = vrkWrap
 
-	// init KD
 	v.kd = KeyDirectory{
 		Items:   map[string]KDItem{},
 		Devices: map[string]Device{},
@@ -103,14 +95,14 @@ func (v *vault) Unlock(ctx context.Context, master []byte) error {
 	kdf := cr.KDFParams{M: h.KDF.M, T: h.KDF.T, P: h.KDF.P, Salt: h.KDF.Salt}
 	v.kek = cr.DeriveKEK(master, kdf)
 
-    vrk, err := cr.OpenAny(v.kek[:], v.header.VRKWrap, []byte("vrk-wrap"))
+	vrk, err := cr.OpenAny(v.kek[:], v.header.VRKWrap, []byte("vrk-wrap"))
 	if err != nil {
 		return err
 	}
 	copy(v.vrk[:], vrk)
 	cr.Zero(vrk)
 
-    kdBytes, err := cr.OpenAny(v.vrk[:], v.header.KDCipher, []byte("kd"))
+	kdBytes, err := cr.OpenAny(v.vrk[:], v.header.KDCipher, []byte("kd"))
 	if err != nil {
 		return err
 	}
@@ -132,7 +124,6 @@ func (v *vault) List(ctx context.Context, q Query) ([]ItemMeta, error) {
 		return nil, ErrNotUnlocked
 	}
 
-	// Prefer remote meta store if configured
 	if v.metaStore != nil {
 		filter := map[string]interface{}{}
 		if q.Type != "" {
@@ -142,7 +133,7 @@ func (v *vault) List(ctx context.Context, q Query) ([]ItemMeta, error) {
 		if err != nil {
 			return nil, err
 		}
-		// storage.ItemMeta == same fields → we can return as-is by copying
+
 		out := make([]ItemMeta, 0, len(smetas))
 		for _, m := range smetas {
 			out = append(out, ItemMeta{
@@ -156,7 +147,6 @@ func (v *vault) List(ctx context.Context, q Query) ([]ItemMeta, error) {
 		return out, nil
 	}
 
-	// Fallback: local cache
 	out := make([]ItemMeta, 0, len(v.meta))
 	for _, m := range v.meta {
 		if q.Type == "" || q.Type == m.Type {
@@ -170,7 +160,7 @@ func (v *vault) RotateMaster(ctx context.Context, newMaster []byte) error {
 	if !v.unlocked {
 		return ErrNotUnlocked
 	}
-	// derive new KEK and rewrap VRK
+
 	newKDF := cr.DefaultDesktopKDF()
 	newKEK := cr.DeriveKEK(newMaster, newKDF)
 	defer zero32(&newKEK)

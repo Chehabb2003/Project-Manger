@@ -1,15 +1,15 @@
 package vault
 
 type Header struct {
-    Version int       `json:"version"`
-    KDF     KDFHeader `json:"kdf"`
-    VRKWrap []byte    `json:"vrk_wrap"`
-    KDCipher []byte   `json:"kd_cipher"`
-    Padding []byte    `json:"padding,omitempty"`
+	Version  int       `json:"version"`
+	KDF      KDFHeader `json:"kdf"`
+	VRKWrap  []byte    `json:"vrk_wrap"`
+	KDCipher []byte    `json:"kd_cipher"`
+	Padding  []byte    `json:"padding,omitempty"`
 }
 
 type KDFHeader struct {
-	Algo string `json:"algo"` // "argon2id"
+	Algo string `json:"algo"`
 	M    uint32 `json:"m"`
 	T    uint32 `json:"t"`
 	P    uint8  `json:"p"`
@@ -23,8 +23,8 @@ type KeyDirectory struct {
 }
 
 type KDItem struct {
-    DekWrap []byte `json:"dek_wrap"`
-    MetaMAC []byte `json:"meta_mac,omitempty"`
+	DekWrap []byte `json:"dek_wrap"`
+	MetaMAC []byte `json:"meta_mac,omitempty"`
 }
 
 type Device struct {
@@ -33,7 +33,6 @@ type Device struct {
 	PubEd25519 []byte `json:"pubEd25519"`
 }
 
-// Item and queries (public API structs)
 type Item struct {
 	Type   string            `json:"type"`
 	Fields map[string]string `json:"fields"`
@@ -48,5 +47,5 @@ type ItemMeta struct {
 }
 
 type Query struct {
-	Type string // filter by type, optional
+	Type string
 }

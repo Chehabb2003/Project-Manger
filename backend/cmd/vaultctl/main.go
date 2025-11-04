@@ -15,14 +15,13 @@ import (
 )
 
 func main() {
-    
+
 	createCmd := flag.NewFlagSet("create", flag.ExitOnError)
 	createVaultPath := createCmd.String("vault", "./main.vlt", "path to vault file")
 	createMongoURI := createCmd.String("mongo", "", "MongoDB URI (optional)")
 	createDB := createCmd.String("db", "vaultdb", "Mongo database name")
 	createColl := createCmd.String("coll", "blobs", "Mongo collection name")
 
-    
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
 	addVaultPath := addCmd.String("vault", "./main.vlt", "path to vault file")
 	site := addCmd.String("site", "", "site name")
@@ -32,7 +31,6 @@ func main() {
 	addDB := addCmd.String("db", "vaultdb", "Mongo database name")
 	addColl := addCmd.String("coll", "blobs", "Mongo collection name")
 
-    
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
 	getVaultPath := getCmd.String("vault", "./main.vlt", "path to vault file")
 	getID := getCmd.String("id", "", "item id")
@@ -40,7 +38,6 @@ func main() {
 	getDB := getCmd.String("db", "vaultdb", "Mongo DB")
 	getColl := getCmd.String("coll", "blobs", "Mongo collection")
 
-    
 	listCmd := flag.NewFlagSet("list", flag.ExitOnError)
 	listVaultPath := listCmd.String("vault", "./main.vlt", "path to vault file")
 	listType := listCmd.String("type", "", "filter by type (e.g. login)")
@@ -48,7 +45,6 @@ func main() {
 	listDB := listCmd.String("db", "vaultdb", "Mongo DB")
 	listColl := listCmd.String("coll", "blobs", "Mongo collection")
 
-    
 	setCmd := flag.NewFlagSet("setpass", flag.ExitOnError)
 	setVaultPath := setCmd.String("vault", "./main.vlt", "path to vault file")
 	setID := setCmd.String("id", "", "item id")
@@ -57,7 +53,6 @@ func main() {
 	setDB := setCmd.String("db", "vaultdb", "Mongo DB")
 	setColl := setCmd.String("coll", "blobs", "Mongo collection")
 
-    
 	delCmd := flag.NewFlagSet("delete", flag.ExitOnError)
 	delVaultPath := delCmd.String("vault", "./main.vlt", "path to vault file")
 	delID := delCmd.String("id", "", "item id")
@@ -343,12 +338,12 @@ func cmdSetPass(path, id, pass string, blobs storage.BlobStore, meta storage.Met
 	}
 	defer vlt.Lock()
 
-    curr, err := vlt.GetItem(ctx, id)
+	curr, err := vlt.GetItem(ctx, id)
 	if err != nil {
 		return err
 	}
 
-    if len(pass) > 4 && pass[:4] == "gen:" {
+	if len(pass) > 4 && pass[:4] == "gen:" {
 		var n int
 		_, _ = fmt.Sscanf(pass, "gen:%d", &n)
 		if n <= 0 {
@@ -362,7 +357,7 @@ func cmdSetPass(path, id, pass string, blobs storage.BlobStore, meta storage.Met
 	}
 	curr.Fields["password"] = pass
 
-    upd := vault.Item{Type: curr.Type, Fields: curr.Fields}
+	upd := vault.Item{Type: curr.Type, Fields: curr.Fields}
 	if err := vlt.UpdateItem(ctx, id, upd); err != nil {
 		return err
 	}

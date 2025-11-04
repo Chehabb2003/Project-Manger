@@ -1,4 +1,3 @@
-// frontend/src/pages/Vault.jsx
 import { useEffect, useMemo, useState } from "react";
 import Layout from "../components/Layout.jsx";
 import ItemRow from "../components/ItemRow.jsx";
@@ -62,7 +61,6 @@ export default function Vault() {
             </p>
           </div>
           <div className="filter-bar">
-            {/* Type filter removed (login-only) */}
             <input
               className="input"
               placeholder="Search everything…"

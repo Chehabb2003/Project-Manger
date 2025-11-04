@@ -47,7 +47,7 @@ func (m *smtpMailer) Enabled() bool {
 }
 
 func (m *smtpMailer) SendResetPassword(to, token string, expires time.Time) error {
-    link := fmt.Sprintf("http://localhost:5173/reset-password?token=%s", token)
+	link := fmt.Sprintf("http://localhost:5173/reset-password?token=%s", token)
 	body := fmt.Sprintf("You requested a password reset. Use the token below before %s UTC.\n\nToken: %s\nReset link: %s\n\nIf you did not request this, ignore the message.",
 		expires.UTC().Format(time.RFC3339), token, link)
 	msg := message(m.cfg.From, to, "Your VaultCraft password reset link", body)

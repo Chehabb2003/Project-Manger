@@ -23,7 +23,6 @@ type TokenParser interface {
 	ParseAndValidate(tokenStr string) (*Claims, error)
 }
 
-// AuthRequired checks Bearer token and adds claims to context.
 func AuthRequired(parser TokenParser) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -43,7 +42,6 @@ func AuthRequired(parser TokenParser) func(http.Handler) http.Handler {
 	}
 }
 
-// RequireRole wraps a handler and ensures claim has given role.
 func RequireRole(role Role) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +68,6 @@ func hasRole(c *Claims, role Role) bool {
 	return false
 }
 
-// Helper to extract user or fail early in handlers
 func MustClaims(r *http.Request) (*Claims, error) {
 	if c, ok := FromContext(r.Context()); ok {
 		return c, nil

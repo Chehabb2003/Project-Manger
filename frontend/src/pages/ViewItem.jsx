@@ -1,4 +1,3 @@
-// frontend/src/pages/ViewItem.jsx
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import Layout from "../components/Layout.jsx";

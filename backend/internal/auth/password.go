@@ -12,8 +12,8 @@ import (
 )
 
 type ArgonParams struct {
-	Memory      uint32 // in KiB (e.g., 64*1024)
-	Time        uint32 // iterations
+	Memory      uint32
+	Time        uint32
 	Parallelism uint8
 	SaltLen     int
 	KeyLen      uint32
@@ -33,7 +33,7 @@ func HashPassword(p ArgonParams, password string) (string, error) {
 		return "", err
 	}
 	key := argon2.IDKey([]byte(password), salt, p.Time, p.Memory, p.Parallelism, p.KeyLen)
-	// encoded format: argon2id$m=<M>,t=<T>,p=<P>$<b64(salt)>$<b64(key)>
+
 	return fmt.Sprintf("argon2id$m=%d,t=%d,p=%d$%s$%s",
 		p.Memory, p.Time, p.Parallelism,
 		base64.RawStdEncoding.EncodeToString(salt),

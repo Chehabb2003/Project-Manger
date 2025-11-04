@@ -1,4 +1,3 @@
-// frontend/src/components/Layout.jsx
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { session as getSession, lock as apiLock } from "../lib/api";
@@ -27,7 +26,6 @@ export default function Layout({ children }) {
           localStorage.setItem("vaultName", s.vault || "");
           localStorage.setItem("username", s.user || "");
         } catch {
-          /* ignore */
         }
       } catch {
         if (!cancelled) {
@@ -45,7 +43,6 @@ export default function Layout({ children }) {
       try {
         await apiLock();
       } catch {
-        /* ignore lock errors */
       }
       setIsUnlocked(false);
       nav("/unlock");

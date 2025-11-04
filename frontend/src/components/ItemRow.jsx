@@ -1,4 +1,3 @@
-// frontend/src/components/ItemRow.jsx
 import { Link } from "react-router-dom";
 
 function last4Digits(s) {

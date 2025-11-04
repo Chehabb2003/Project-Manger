@@ -6,10 +6,6 @@ import (
 	xchacha "golang.org/x/crypto/chacha20poly1305"
 )
 
-// OpenAny first tries the current envelope Open(); if that fails due to MAC
-// mismatch, it falls back to legacy XChaCha20-Poly1305 format used by older
-// vault files/items. This provides backward compatibility for data created
-// before the encryption refactor.
 func OpenAny(key, ciphertext, aad []byte) ([]byte, error) {
 	if pt, err := Open(key, ciphertext, aad); err == nil {
 		return pt, nil
@@ -17,7 +13,7 @@ func OpenAny(key, ciphertext, aad []byte) ([]byte, error) {
 	if pt, err := openLegacyCTR(key, ciphertext, aad); err == nil {
 		return pt, nil
 	}
-	// Fallback attempt using XChaCha20-Poly1305
+
 	a, err := xchacha.NewX(key)
 	if err != nil {
 		return nil, err

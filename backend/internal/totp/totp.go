@@ -14,7 +14,7 @@ import (
 const (
 	DefaultStep   = 30 * time.Second
 	DefaultDigits = 6
-	secretSize    = 20 // 160-bit secret
+	secretSize    = 20
 )
 
 func GenerateSecret() (string, error) {

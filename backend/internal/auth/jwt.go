@@ -13,8 +13,8 @@ import (
 type JWTSigner struct {
 	Priv ed25519.PrivateKey
 	Pub  ed25519.PublicKey
-	Iss  string        // issuer, e.g. "crypto-backend"
-	TTL  time.Duration // e.g., 15 * time.Minute
+	Iss  string
+	TTL  time.Duration
 }
 
 func NewJWTSigner(priv ed25519.PrivateKey, iss string, ttl time.Duration) *JWTSigner {
@@ -22,7 +22,6 @@ func NewJWTSigner(priv ed25519.PrivateKey, iss string, ttl time.Duration) *JWTSi
 	return &JWTSigner{Priv: priv, Pub: pub, Iss: iss, TTL: ttl}
 }
 
-// FIX 1: return order (pub, priv, err) -> (priv, pub, err)
 func GenerateEd25519() (ed25519.PrivateKey, ed25519.PublicKey, error) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	return priv, pub, err
@@ -37,7 +36,7 @@ func (s *JWTSigner) IssueToken(sub string, roles []Role) (string, time.Time, err
 		"sub":   sub,
 		"iat":   now.Unix(),
 		"exp":   exp.Unix(),
-		"jti":   randomJTI(), // FIX 2 uses base64 below
+		"jti":   randomJTI(),
 		"roles": roles,
 	}
 
@@ -99,7 +98,6 @@ func (s *JWTSigner) ParseAndValidate(tokenStr string) (*Claims, error) {
 	}, nil
 }
 
-// FIX 2: use base64url for a compact jti
 func randomJTI() string {
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)
