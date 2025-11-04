@@ -1,6 +1,0 @@
-./aead_xchacha.go
-./dh_x25519.go
-./kdf_argon2id.go
-./memguard.go
-./sig_ed25519.go
-./zero.go

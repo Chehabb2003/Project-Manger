@@ -7,10 +7,11 @@ import (
 
 // Swap this with your real storage (DB, meta store, etc.)
 type User struct {
-	Username string
-	Email    string
-	PassHash string // argon2id encoded string
-	Roles    []Role
+	Username   string
+	Email      string
+	PassHash   string // argon2id encoded string
+	Roles      []Role
+	TOTPSecret string
 }
 
 type UserStore interface {
@@ -51,10 +52,11 @@ func (s *MemoryUserStore) Add(u *User) error {
 			return errors.New("email already exists")
 		}
 	}
-	s.byUsername[u.Username] = u
+	clone := *u
+	clone.Email = email
+	s.byUsername[u.Username] = &clone
 	if email != "" {
-		u.Email = email
-		s.byEmail[email] = u
+		s.byEmail[email] = &clone
 	}
 	return nil
 }
@@ -76,7 +78,8 @@ func (s *MemoryUserStore) FindByUsername(username string) (*User, error) {
 		return nil, errors.New("store not initialized")
 	}
 	if u, ok := s.byUsername[username]; ok {
-		return u, nil
+		clone := *u
+		return &clone, nil
 	}
 	return nil, errors.New("user not found")
 }
@@ -86,7 +89,8 @@ func (s *MemoryUserStore) FindByEmail(email string) (*User, error) {
 		return nil, errors.New("store not initialized")
 	}
 	if u, ok := s.byEmail[strings.ToLower(strings.TrimSpace(email))]; ok {
-		return u, nil
+		clone := *u
+		return &clone, nil
 	}
 	return nil, errors.New("user not found")
 }

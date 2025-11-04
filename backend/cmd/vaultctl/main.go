@@ -15,14 +15,14 @@ import (
 )
 
 func main() {
-	// ---- create ----
+    
 	createCmd := flag.NewFlagSet("create", flag.ExitOnError)
 	createVaultPath := createCmd.String("vault", "./main.vlt", "path to vault file")
 	createMongoURI := createCmd.String("mongo", "", "MongoDB URI (optional)")
 	createDB := createCmd.String("db", "vaultdb", "Mongo database name")
 	createColl := createCmd.String("coll", "blobs", "Mongo collection name")
 
-	// ---- add ----
+    
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
 	addVaultPath := addCmd.String("vault", "./main.vlt", "path to vault file")
 	site := addCmd.String("site", "", "site name")
@@ -32,7 +32,7 @@ func main() {
 	addDB := addCmd.String("db", "vaultdb", "Mongo database name")
 	addColl := addCmd.String("coll", "blobs", "Mongo collection name")
 
-	// ---- get ----
+    
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
 	getVaultPath := getCmd.String("vault", "./main.vlt", "path to vault file")
 	getID := getCmd.String("id", "", "item id")
@@ -40,7 +40,7 @@ func main() {
 	getDB := getCmd.String("db", "vaultdb", "Mongo DB")
 	getColl := getCmd.String("coll", "blobs", "Mongo collection")
 
-	// ---- list ----
+    
 	listCmd := flag.NewFlagSet("list", flag.ExitOnError)
 	listVaultPath := listCmd.String("vault", "./main.vlt", "path to vault file")
 	listType := listCmd.String("type", "", "filter by type (e.g. login)")
@@ -48,7 +48,7 @@ func main() {
 	listDB := listCmd.String("db", "vaultdb", "Mongo DB")
 	listColl := listCmd.String("coll", "blobs", "Mongo collection")
 
-	// ---- setpass ----
+    
 	setCmd := flag.NewFlagSet("setpass", flag.ExitOnError)
 	setVaultPath := setCmd.String("vault", "./main.vlt", "path to vault file")
 	setID := setCmd.String("id", "", "item id")
@@ -57,7 +57,7 @@ func main() {
 	setDB := setCmd.String("db", "vaultdb", "Mongo DB")
 	setColl := setCmd.String("coll", "blobs", "Mongo collection")
 
-	// ---- delete ----
+    
 	delCmd := flag.NewFlagSet("delete", flag.ExitOnError)
 	delVaultPath := delCmd.String("vault", "./main.vlt", "path to vault file")
 	delID := delCmd.String("id", "", "item id")
@@ -111,8 +111,6 @@ func main() {
 		usage()
 	}
 }
-
-// ============ Helper Functions ============
 
 func usage() {
 	fmt.Print(`vaultctl commands:
@@ -265,8 +263,6 @@ func cmdList(path, typ string, blobs storage.BlobStore, meta storage.MetaStore) 
 	return nil
 }
 
-// ============ Utilities ============
-
 func promptSecret(prompt string) ([]byte, error) {
 	fmt.Print(prompt)
 	br := bufio.NewReader(os.Stdin)
@@ -326,7 +322,6 @@ func filepathBase(p string) string {
 	return p[last+1:]
 }
 
-// Change the password field of an item (keeps other fields intact).
 func cmdSetPass(path, id, pass string, blobs storage.BlobStore, meta storage.MetaStore) error {
 	if id == "" {
 		return errors.New("--id required")
@@ -348,14 +343,12 @@ func cmdSetPass(path, id, pass string, blobs storage.BlobStore, meta storage.Met
 	}
 	defer vlt.Lock()
 
-	// fetch the current item
-	curr, err := vlt.GetItem(ctx, id)
+    curr, err := vlt.GetItem(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	// auto-generate if requested (e.g., gen:24)
-	if len(pass) > 4 && pass[:4] == "gen:" {
+    if len(pass) > 4 && pass[:4] == "gen:" {
 		var n int
 		_, _ = fmt.Sscanf(pass, "gen:%d", &n)
 		if n <= 0 {
@@ -369,8 +362,7 @@ func cmdSetPass(path, id, pass string, blobs storage.BlobStore, meta storage.Met
 	}
 	curr.Fields["password"] = pass
 
-	// keep same type; only update fields
-	upd := vault.Item{Type: curr.Type, Fields: curr.Fields}
+    upd := vault.Item{Type: curr.Type, Fields: curr.Fields}
 	if err := vlt.UpdateItem(ctx, id, upd); err != nil {
 		return err
 	}
@@ -379,7 +371,6 @@ func cmdSetPass(path, id, pass string, blobs storage.BlobStore, meta storage.Met
 	return nil
 }
 
-// Delete an item (removes meta, blob and KD entry).
 func cmdDelete(path, id string, blobs storage.BlobStore, meta storage.MetaStore) error {
 	if id == "" {
 		return errors.New("--id required")

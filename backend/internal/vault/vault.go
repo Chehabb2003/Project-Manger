@@ -2,7 +2,7 @@ package vault
 
 import (
 	"context"
-	"crypto/rand" 
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -72,10 +72,10 @@ func (v *vault) Create(ctx context.Context, master []byte) error {
 	defer zero32(&v.kek)
 
 	// create VRK
-	_, _ = rand.Read(v.vrk[:])// or crypto/rand.Read; RandRead is fine if you have it
+	_, _ = rand.Read(v.vrk[:]) // or crypto/rand.Read; RandRead is fine if you have it
 
 	// wrap VRK with KEK
-	vrkWrap, err := cr.SealX(v.kek[:], v.vrk[:], []byte("vrk-wrap"))
+	vrkWrap, err := cr.Seal(v.kek[:], v.vrk[:], []byte("vrk-wrap"))
 	if err != nil {
 		return err
 	}
@@ -103,14 +103,14 @@ func (v *vault) Unlock(ctx context.Context, master []byte) error {
 	kdf := cr.KDFParams{M: h.KDF.M, T: h.KDF.T, P: h.KDF.P, Salt: h.KDF.Salt}
 	v.kek = cr.DeriveKEK(master, kdf)
 
-	vrk, err := cr.OpenX(v.kek[:], v.header.VRKWrap, []byte("vrk-wrap"))
+    vrk, err := cr.OpenAny(v.kek[:], v.header.VRKWrap, []byte("vrk-wrap"))
 	if err != nil {
 		return err
 	}
 	copy(v.vrk[:], vrk)
 	cr.Zero(vrk)
 
-	kdBytes, err := cr.OpenX(v.vrk[:], v.header.KDCipher, []byte("kd"))
+    kdBytes, err := cr.OpenAny(v.vrk[:], v.header.KDCipher, []byte("kd"))
 	if err != nil {
 		return err
 	}
@@ -175,7 +175,7 @@ func (v *vault) RotateMaster(ctx context.Context, newMaster []byte) error {
 	newKEK := cr.DeriveKEK(newMaster, newKDF)
 	defer zero32(&newKEK)
 
-	vrkWrap, err := cr.SealX(newKEK[:], v.vrk[:], []byte("vrk-wrap"))
+	vrkWrap, err := cr.Seal(newKEK[:], v.vrk[:], []byte("vrk-wrap"))
 	if err != nil {
 		return err
 	}
@@ -191,7 +191,7 @@ func (v *vault) RotateMaster(ctx context.Context, newMaster []byte) error {
 
 func (v *vault) flushKD() error {
 	kdBytes, _ := json.Marshal(v.kd)
-	ct, err := cr.SealX(v.vrk[:], kdBytes, []byte("kd"))
+	ct, err := cr.Seal(v.vrk[:], kdBytes, []byte("kd"))
 	if err != nil {
 		return err
 	}

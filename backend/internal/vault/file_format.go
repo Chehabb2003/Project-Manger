@@ -1,11 +1,11 @@
 package vault
 
 type Header struct {
-	Version int       `json:"version"`
-	KDF     KDFHeader `json:"kdf"`
-	VRKWrap []byte    `json:"vrk_wrap"` // AEAD_KEK(VRK||...)
-	KDCipher []byte   `json:"kd_cipher"`// AEAD_VRK(KeyDirectory)
-	Padding []byte    `json:"padding,omitempty"`
+    Version int       `json:"version"`
+    KDF     KDFHeader `json:"kdf"`
+    VRKWrap []byte    `json:"vrk_wrap"`
+    KDCipher []byte   `json:"kd_cipher"`
+    Padding []byte    `json:"padding,omitempty"`
 }
 
 type KDFHeader struct {
@@ -23,8 +23,8 @@ type KeyDirectory struct {
 }
 
 type KDItem struct {
-	DekWrap []byte `json:"dek_wrap"` // AEAD_VRK(DEK)
-	MetaMAC []byte `json:"meta_mac,omitempty"`
+    DekWrap []byte `json:"dek_wrap"`
+    MetaMAC []byte `json:"meta_mac,omitempty"`
 }
 
 type Device struct {

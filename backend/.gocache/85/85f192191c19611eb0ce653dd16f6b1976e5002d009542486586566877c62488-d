@@ -1,5 +1,0 @@
-=== RUN   TestScan
-    password_debug_test.go:14: n=4 err=unexpected EOF mem=65536 time=3 parallel=1 salt="0Jq+AUTXKHHTsDPNOEAfsA$Je8Qa1epXhgiYuV0Aimhv9czjtu5gUDKMQpgt2Z2Wxo" key=""
---- PASS: TestScan (0.00s)
-PASS
-ok  	project-crypto/internal/auth	0.003s

@@ -11,8 +11,8 @@ import (
 )
 
 type mongoBlobStore struct {
-	client *mongo.Client
-	coll   *mongo.Collection
+    client *mongo.Client
+    coll   *mongo.Collection
 }
 
 // ---------- BLOB STORE (ciphertext blobs) ----------
@@ -42,6 +42,15 @@ func NewMongoBlobStore(ctx context.Context, uri, dbName, collName string) (BlobS
 	})
 
 	return &mongoBlobStore{client: cli, coll: coll}, nil
+}
+
+// NewMongoBlobStoreWithClient reuses an existing mongo.Client.
+func NewMongoBlobStoreWithClient(cli *mongo.Client, dbName, collName string) (BlobStore, error) {
+    if cli == nil {
+        return nil, errors.New("mongo client is nil")
+    }
+    coll := cli.Database(dbName).Collection(collName)
+    return &mongoBlobStore{client: cli, coll: coll}, nil
 }
 
 func (m *mongoBlobStore) Put(ctx context.Context, id string, data []byte) error {
@@ -137,6 +146,15 @@ func NewMongoMetaStore(ctx context.Context, uri, dbName, collName string) (*Mong
 	})
 
 	return &MongoMetaStore{client: cli, coll: coll}, nil
+}
+
+// NewMongoMetaStoreWithClient reuses an existing mongo.Client.
+func NewMongoMetaStoreWithClient(cli *mongo.Client, dbName, collName string) (*MongoMetaStore, error) {
+    if cli == nil {
+        return nil, errors.New("mongo client is nil")
+    }
+    coll := cli.Database(dbName).Collection(collName)
+    return &MongoMetaStore{client: cli, coll: coll}, nil
 }
 
 func (m *MongoMetaStore) PutMeta(ctx context.Context, meta ItemMeta) error {

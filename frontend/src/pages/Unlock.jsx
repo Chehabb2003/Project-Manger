@@ -31,6 +31,8 @@ export default function Unlock() {
   const [busy, setBusy] = useState(false);
   const [loginChallenge, setLoginChallenge] = useState(null);
   const [twoFACode, setTwoFACode] = useState("");
+  const [totpSetup, setTotpSetup] = useState(null);
+  const [copyNote, setCopyNote] = useState("");
 
   const navigate = useNavigate();
 
@@ -47,6 +49,8 @@ export default function Unlock() {
     setErr("");
     setLoginChallenge(null);
     setTwoFACode("");
+    setTotpSetup(null);
+    setCopyNote("");
   }
 
   async function onSubmit(e) {
@@ -84,15 +88,15 @@ export default function Unlock() {
           setErr("Please enter your username/email and password.");
           return;
         }
-
         const data = await login(ident, password);
         if (data?.token) {
           setMsg("Welcome back! Redirecting to your vault…");
+          setTotpSetup(null);
           setTimeout(() => navigate("/vault"), 400);
         } else if (data?.challenge_id) {
           setLoginChallenge(data);
           setTwoFACode("");
-          setMsg(data?.note || "We just emailed you a verification code.");
+          setMsg(data?.note || "Enter the code from your authenticator app.");
         } else {
           setErr("Unexpected server response.");
         }
@@ -100,6 +104,27 @@ export default function Unlock() {
       }
 
       if (mode === "signup") {
+        if (loginChallenge) {
+          const pin = twoFACode.trim();
+          if (!pin) {
+            setErr("Enter the six-digit verification code from your authenticator.");
+            return;
+          }
+          const res = await verifyLogin(loginChallenge.challenge_id, pin);
+          if (res?.token) {
+            setMsg("Authenticator confirmed! Unlocking your new vault…");
+            setLoginChallenge(null);
+            setTwoFACode("");
+            setPassword("");
+            setConfirm("");
+            setTotpSetup(null);
+            setTimeout(() => navigate("/vault"), 350);
+          } else {
+            setErr("Unexpected server response.");
+          }
+          return;
+        }
+
         const uname = username.trim();
         const mail = email.trim().toLowerCase();
         if (!uname) {
@@ -119,9 +144,21 @@ export default function Unlock() {
           setPwErr("Your password still needs " + issues.join(", "));
           return;
         }
-        await signup(uname, mail, password);
-        setMsg("Account created! Taking you to your new vault…");
-        setTimeout(() => navigate("/vault"), 400);
+        const data = await signup(uname, mail, password);
+        if (data?.totp_secret) {
+          setTotpSetup({ secret: data.totp_secret, uri: data.totp_uri || "" });
+          setCopyNote("");
+          setLoginChallenge({
+            challenge_id: data.challenge_id,
+            expires_at: data.expires_at,
+            fromSignup: true,
+          });
+          setTwoFACode("");
+          setMsg("Add the secret to your authenticator, then enter the 6-digit code to finish signup.");
+        } else {
+          setMsg("Account created! Taking you to your new vault…");
+          setTimeout(() => navigate("/vault"), 400);
+        }
         return;
       }
 
@@ -141,6 +178,19 @@ export default function Unlock() {
       }
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function copyTotpSecret() {
+    if (!totpSetup?.secret || typeof navigator === "undefined" || !navigator.clipboard) {
+      setCopyNote("Copy is not available in this browser.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(totpSetup.secret);
+      setCopyNote("Secret copied to clipboard.");
+    } catch (errCopy) {
+      setCopyNote("Could not copy secret automatically.");
     }
   }
 
@@ -243,7 +293,7 @@ export default function Unlock() {
           </>
         )}
 
-        {mode === "login" && loginChallenge && (
+        {loginChallenge && (mode === "login" || mode === "signup") && (
           <div className="form-field">
             <label className="input-label" htmlFor="twofa-code">
               Verification code
@@ -349,7 +399,9 @@ export default function Unlock() {
               {busy
                 ? "Working…"
                 : mode === "signup"
-                ? "Create your vault"
+                ? loginChallenge
+                  ? "Verify & unlock"
+                  : "Create your vault"
                 : mode === "login"
                 ? loginChallenge
                   ? "Verify code"
@@ -357,6 +409,36 @@ export default function Unlock() {
                 : "Send reset email"}
             </button>
           </form>
+          {totpSetup && (
+            <div className="totp-setup-card" role="status">
+              <h3>Finish setting up 2-step verification</h3>
+              <p>
+                Add this secret to your authenticator app (such as Google Authenticator, 1Password, or Authy).
+                You&apos;ll need its rolling code every time you sign in.
+              </p>
+              <div className="totp-secret">
+                <span className="secret-label">Secret</span>
+                <code>{totpSetup.secret}</code>
+                <button
+                  type="button"
+                  className="btn btn-tertiary"
+                  onClick={copyTotpSecret}
+                >
+                  Copy secret
+                </button>
+              </div>
+              {/* {totpSetup.uri && (
+                <p className="helper-text">
+                  Authenticator URI:&nbsp;
+                  <a href={totpSetup.uri}>{totpSetup.uri}</a>
+                </p>
+              )}
+              {copyNote && <p className="helper-text">{copyNote}</p>} */}
+              <p className="helper-text">
+                Enter a fresh code from your authenticator above, then click <strong>Verify &amp; unlock</strong> to continue.
+              </p>
+            </div>
+          )}
         </section>
       </div>
     </div>

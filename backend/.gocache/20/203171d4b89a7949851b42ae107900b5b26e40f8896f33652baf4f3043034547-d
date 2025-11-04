@@ -1,0 +1,7 @@
+./dh_x25519.go
+./envelope.go
+./kdf_argon2id.go
+./legacy_xchacha.go
+./memguard.go
+./sig_ed25519.go
+./zero.go

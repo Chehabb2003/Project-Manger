@@ -52,12 +52,14 @@ func NewMongoUserStore(ctx context.Context, uri, db, coll string) (*MongoUserSto
 func (s *MongoUserStore) Add(u *User) error {
 	email := strings.ToLower(strings.TrimSpace(u.Email))
 	u.Email = email
-	_, err := s.coll.InsertOne(context.Background(), bson.M{
-		"username":  u.Username,
-		"email":     email,
-		"pass_hash": u.PassHash,
-		"roles":     u.Roles, // []Role is []string under the hood
-	})
+	doc := bson.M{
+		"username":    u.Username,
+		"email":       email,
+		"pass_hash":   u.PassHash,
+		"roles":       u.Roles, // []Role is []string under the hood
+		"totp_secret": strings.TrimSpace(u.TOTPSecret),
+	}
+	_, err := s.coll.InsertOne(context.Background(), doc)
 	if wex, ok := err.(mongo.WriteException); ok {
 		for _, we := range wex.WriteErrors {
 			if we.Code == 11000 { // duplicate key
@@ -80,10 +82,11 @@ func (s *MongoUserStore) FindByEmail(email string) (*User, error) {
 
 func (s *MongoUserStore) findOne(filter interface{}) (*User, error) {
 	var doc struct {
-		Username string `bson:"username"`
-		Email    string `bson:"email"`
-		PassHash string `bson:"pass_hash"`
-		Roles    []Role `bson:"roles"`
+		Username   string `bson:"username"`
+		Email      string `bson:"email"`
+		PassHash   string `bson:"pass_hash"`
+		Roles      []Role `bson:"roles"`
+		TOTPSecret string `bson:"totp_secret"`
 	}
 	err := s.coll.FindOne(context.Background(), filter).Decode(&doc)
 	if err == mongo.ErrNoDocuments {
@@ -93,10 +96,11 @@ func (s *MongoUserStore) findOne(filter interface{}) (*User, error) {
 		return nil, err
 	}
 	return &User{
-		Username: doc.Username,
-		Email:    doc.Email,
-		PassHash: doc.PassHash,
-		Roles:    doc.Roles,
+		Username:   doc.Username,
+		Email:      doc.Email,
+		PassHash:   doc.PassHash,
+		Roles:      doc.Roles,
+		TOTPSecret: doc.TOTPSecret,
 	}, nil
 }
 

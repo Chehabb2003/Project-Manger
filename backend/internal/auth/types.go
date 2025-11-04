@@ -17,7 +17,6 @@ type Claims struct {
 	ExpiresAt int64  `json:"exp"`
 }
 
-// Login request/response DTOs
 type LoginRequest struct {
 	Username   string `json:"username"`
 	Identifier string `json:"identifier"`

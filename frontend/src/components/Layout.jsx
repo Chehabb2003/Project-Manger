@@ -8,6 +8,9 @@ export default function Layout({ children }) {
   const [vaultName, setVaultName] = useState(
     typeof localStorage !== "undefined" ? localStorage.getItem("vaultName") || "" : ""
   );
+  const [username, setUsername] = useState(
+    typeof localStorage !== "undefined" ? localStorage.getItem("username") || "" : ""
+  );
   const nav = useNavigate();
   const loc = useLocation();
 
@@ -19,8 +22,10 @@ export default function Layout({ children }) {
         if (cancelled) return;
         setIsUnlocked(!!s.unlocked);
         setVaultName(s.vault || "");
+        setUsername(s.user || "");
         try {
           localStorage.setItem("vaultName", s.vault || "");
+          localStorage.setItem("username", s.user || "");
         } catch {
           /* ignore */
         }
@@ -49,7 +54,7 @@ export default function Layout({ children }) {
     }
   }
 
-  const vaultLabel = vaultName ? `Vault · ${vaultName}` : "Vault locked";
+  const userLabel = username ? `Signed in as ${username}` : "";
 
   return (
     <div className="app-shell">
@@ -63,10 +68,12 @@ export default function Layout({ children }) {
         </Link>
 
         <div className="header-actions">
-          {/* <span className="vault-chip">
-            <span aria-hidden="true">📁</span>
-            {vaultLabel}
-          </span> */}
+          {userLabel && (
+            <span className="vault-chip">
+              <span aria-hidden="true">👤</span>
+              {userLabel}
+            </span>
+          )}
 
           {isUnlocked && (
             <Link to="/items/new" className="btn btn-primary">
