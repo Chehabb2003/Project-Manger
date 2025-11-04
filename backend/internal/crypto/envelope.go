@@ -14,10 +14,14 @@ import (
 )
 
 const (
-	envelopeSaltSize = 32
-	envelopeIVSize   = aes.BlockSize // 16 bytes
-	envelopeMacSize  = sha256.Size   // 32 bytes
-	envelopeMinSize  = envelopeSaltSize + envelopeIVSize + envelopeMacSize
+	envelopeSaltSize  = 32
+	envelopeNonceSize = 12
+	envelopeTagSize   = 16
+	envelopeMinSize   = envelopeSaltSize + envelopeNonceSize + envelopeTagSize
+
+	legacyIVSize  = aes.BlockSize
+	legacyMacSize = sha256.Size
+	legacyMinSize = envelopeSaltSize + legacyIVSize + legacyMacSize
 )
 
 var (
@@ -25,10 +29,8 @@ var (
 	ErrInvalidMAC         = errors.New("crypto: message authentication failed")
 )
 
-// Seal applies encrypt-then-MAC using AES-CTR for confidentiality and HMAC-SHA256
-// for integrity. Keys are derived from the provided master key with HKDF-SHA256,
-// using a per-message random salt baked into the ciphertext. Returned layout:
-// [salt||iv||ciphertext||mac].
+// Seal encrypts using AES-256-GCM with per-message salt-derived keys.
+// Layout: [salt (32) || nonce (12) || ciphertext+tag (16-byte tag appended)].
 func Seal(masterKey, plaintext, aad []byte) ([]byte, error) {
 	if len(masterKey) == 0 {
 		return nil, errors.New("crypto: empty master key")
@@ -39,37 +41,42 @@ func Seal(masterKey, plaintext, aad []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	encKey, macKey, err := deriveEnvelopeKeys(masterKey, salt)
+	encKey, err := deriveGCMKey(masterKey, salt)
 	if err != nil {
 		return nil, err
 	}
 	defer Zero(encKey)
-	defer Zero(macKey)
 
 	block, err := aes.NewCipher(encKey)
 	if err != nil {
 		return nil, err
 	}
 
-	iv := make([]byte, envelopeIVSize)
-	if _, err := rand.Read(iv); err != nil {
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	if gcm.NonceSize() != envelopeNonceSize {
+		return nil, errors.New("crypto: unexpected gcm nonce size")
+	}
+	if gcm.Overhead() != envelopeTagSize {
+		return nil, errors.New("crypto: unexpected gcm tag size")
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
 		return nil, err
 	}
 
-	ct := make([]byte, len(plaintext))
-	cipher.NewCTR(block, iv).XORKeyStream(ct, plaintext)
-
-	macTag := computeMAC(macKey, aad, iv, ct)
-
-	out := make([]byte, 0, envelopeSaltSize+envelopeIVSize+len(ct)+envelopeMacSize)
+	ct := gcm.Seal(nil, nonce, plaintext, aad)
+	out := make([]byte, 0, envelopeSaltSize+len(nonce)+len(ct))
 	out = append(out, salt...)
-	out = append(out, iv...)
+	out = append(out, nonce...)
 	out = append(out, ct...)
-	out = append(out, macTag...)
 	return out, nil
 }
 
-// Open decrypts and authenticates data previously sealed with Seal.
+// Open decrypts ciphertext produced by Seal.
 func Open(masterKey, ciphertext, aad []byte) ([]byte, error) {
 	if len(ciphertext) < envelopeMinSize {
 		return nil, ErrCiphertextTooShort
@@ -79,19 +86,68 @@ func Open(masterKey, ciphertext, aad []byte) ([]byte, error) {
 	}
 
 	salt := ciphertext[:envelopeSaltSize]
-	iv := ciphertext[envelopeSaltSize : envelopeSaltSize+envelopeIVSize]
-	macStart := len(ciphertext) - envelopeMacSize
-	body := ciphertext[envelopeSaltSize+envelopeIVSize : macStart]
+	nonce := ciphertext[envelopeSaltSize : envelopeSaltSize+envelopeNonceSize]
+	body := ciphertext[envelopeSaltSize+envelopeNonceSize:]
+
+	encKey, err := deriveGCMKey(masterKey, salt)
+	if err != nil {
+		return nil, err
+	}
+	defer Zero(encKey)
+
+	block, err := aes.NewCipher(encKey)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	if len(nonce) != gcm.NonceSize() {
+		return nil, ErrCiphertextTooShort
+	}
+
+	pt, err := gcm.Open(nil, nonce, body, aad)
+	if err != nil {
+		return nil, err
+	}
+	return pt, nil
+}
+
+func deriveGCMKey(masterKey, salt []byte) ([]byte, error) {
+	stream := hkdf.New(sha256.New, masterKey, salt, []byte("vault/envelope/v2"))
+	encKey := make([]byte, 32)
+	if _, err := io.ReadFull(stream, encKey); err != nil {
+		return nil, err
+	}
+	return encKey, nil
+}
+
+// openLegacyCTR decrypts legacy AES-CTR + HMAC sealed blobs. It is retained to
+// support existing data and should not be used for new writes.
+func openLegacyCTR(masterKey, ciphertext, aad []byte) ([]byte, error) {
+	if len(ciphertext) < legacyMinSize {
+		return nil, ErrCiphertextTooShort
+	}
+	if len(masterKey) == 0 {
+		return nil, errors.New("crypto: empty master key")
+	}
+
+	salt := ciphertext[:envelopeSaltSize]
+	iv := ciphertext[envelopeSaltSize : envelopeSaltSize+legacyIVSize]
+	macStart := len(ciphertext) - legacyMacSize
+	body := ciphertext[envelopeSaltSize+legacyIVSize : macStart]
 	macTag := ciphertext[macStart:]
 
-	encKey, macKey, err := deriveEnvelopeKeys(masterKey, salt)
+	encKey, macKey, err := deriveLegacyEnvelopeKeys(masterKey, salt)
 	if err != nil {
 		return nil, err
 	}
 	defer Zero(encKey)
 	defer Zero(macKey)
 
-	expected := computeMAC(macKey, aad, iv, body)
+	expected := computeLegacyMAC(macKey, aad, iv, body)
 	if subtle.ConstantTimeCompare(expected, macTag) != 1 {
 		return nil, ErrInvalidMAC
 	}
@@ -106,7 +162,7 @@ func Open(masterKey, ciphertext, aad []byte) ([]byte, error) {
 	return pt, nil
 }
 
-func deriveEnvelopeKeys(masterKey, salt []byte) (encKey, macKey []byte, err error) {
+func deriveLegacyEnvelopeKeys(masterKey, salt []byte) (encKey, macKey []byte, err error) {
 	stream := hkdf.New(sha256.New, masterKey, salt, []byte("vault/envelope/v1"))
 	encKey = make([]byte, 32)
 	macKey = make([]byte, 32)
@@ -119,7 +175,7 @@ func deriveEnvelopeKeys(masterKey, salt []byte) (encKey, macKey []byte, err erro
 	return encKey, macKey, nil
 }
 
-func computeMAC(macKey, aad, iv, ciphertext []byte) []byte {
+func computeLegacyMAC(macKey, aad, iv, ciphertext []byte) []byte {
 	mac := hmac.New(sha256.New, macKey)
 	if len(aad) > 0 {
 		mac.Write(aad)
