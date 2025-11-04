@@ -6,7 +6,7 @@ import { listItems } from "../lib/api";
 
 export default function Vault() {
   const [items, setItems] = useState([]);
-  const [typeFilter, setTypeFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("login");
   const [query, setQuery] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,8 +17,7 @@ export default function Vault() {
       setLoading(true);
       setErr("");
       try {
-        const params = {};
-        if (typeFilter) params.type = typeFilter;
+        const params = { type: "login" };
         const { items: data } = await listItems(params);
         if (!cancelled) {
           setItems(Array.isArray(data) ? data : []);
@@ -58,22 +57,12 @@ export default function Vault() {
             <h1 className="section-title">Your secure vault</h1>
             <p className="section-subtitle">
               {items.length
-                ? `${items.length} item${items.length === 1 ? "" : "s"} tucked behind quantum-grade encryption`
-                : "Start by adding logins, cards, or secret notes to your vault."}
+                ? `${items.length} login${items.length === 1 ? "" : "s"} tucked behind quantum-grade encryption`
+                : "Start by adding your first login to your vault."}
             </p>
           </div>
           <div className="filter-bar">
-            <select
-              className="select"
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              aria-label="Filter by type"
-            >
-              <option value="">All types</option>
-              <option value="login">Logins</option>
-              <option value="note">Secure notes</option>
-              <option value="card">Cards</option>
-            </select>
+            {/* Type filter removed (login-only) */}
             <input
               className="input"
               placeholder="Search everything…"
@@ -100,11 +89,7 @@ export default function Vault() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="glass-card empty-state">
-          <p>
-            {items.length === 0
-              ? "Nothing here yet—why not add your first login or secure note?"
-              : "No items match your search. Try adjusting the filters."}
-          </p>
+          <p>{items.length === 0 ? "Nothing here yet—why not add your first login?" : "No items match your search."}</p>
         </div>
       ) : (
         <div className="item-grid">

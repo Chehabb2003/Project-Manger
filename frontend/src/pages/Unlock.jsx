@@ -203,7 +203,7 @@ export default function Unlock() {
             Effortless, beautiful password security for the modern web.
           </h1>
           <p className="auth-copy">
-            VaultCraft keeps every credential, note, and secret wrapped in resilient encryption.
+            VaultCraft keeps every credential and secret wrapped in resilient encryption.
             Breathe easy knowing your digital life lives behind a handcrafted vault.
           </p>
           <ul className="auth-features">
@@ -213,7 +213,7 @@ export default function Unlock() {
             </li>
             <li className="auth-feature">
               <span>⚡️</span>
-              <div>Instant unlocks, global search, and elegant item cards.</div>
+              <div>Instant unlocks, global search, and elegant login cards.</div>
             </li>
             <li className="auth-feature">
               <span>🌙</span>

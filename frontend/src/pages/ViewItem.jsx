@@ -45,12 +45,11 @@ export default function ViewItem() {
   }
 
   const tRaw = (item?.type || "").toLowerCase();
-  const isCard = tRaw === "card";
-  const isNote = tRaw === "note" || tRaw === "secure note" || tRaw === "secure-note";
+  const isCard = false;
+  const isNote = false;
   const f = item?.fields || {};
 
-  const title =
-    (isCard && "Card") || (isNote && "Secure note") || "Login item";
+  const title = "Login item";
 
   return (
     <Layout>

@@ -198,20 +198,38 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		identifier = strings.TrimSpace(req.Username)
 	}
 
-	var user *auth.User
-	var err error
-	if identifier != "" {
-		user, err = s.users.FindByUsername(identifier)
-		if err != nil {
-			user, err = s.users.FindByEmail(identifier)
-		}
-	} else {
-		err = errors.New("identifier missing")
-	}
-	if err != nil {
-		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+	// Rate limit by IP and identifier
+	ip := getClientIP(r)
+	if !s.rlLoginIP.allow(ip) {
+		tooMany(w, 60)
 		return
 	}
+	idKey := strings.ToLower(strings.TrimSpace(identifier))
+	if idKey != "" && !s.rlLoginID.allow(idKey) {
+		tooMany(w, 60)
+		return
+	}
+
+    var user *auth.User
+    var err error
+    if identifier != "" {
+        user, err = s.users.FindByUsername(identifier)
+        if err != nil {
+            user, err = s.users.FindByEmail(identifier)
+        }
+    } else {
+        err = errors.New("identifier missing")
+    }
+    if err != nil {
+        http.Error(w, "invalid credentials", http.StatusUnauthorized)
+        return
+    }
+
+    // Also rate limit by canonical username to prevent alias bypass (email vs username)
+    if !s.rlLoginID.allow(strings.ToLower(user.Username)) {
+        tooMany(w, 60)
+        return
+    }
 
 	ok, err := auth.VerifyPassword(req.Password, user.PassHash)
 	if err != nil || !ok {
@@ -277,6 +295,17 @@ func (s *Server) handleLoginVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Rate limit by IP and challenge id
+	ip := getClientIP(r)
+	if !s.rlTotpIP.allow(ip) {
+		tooMany(w, 30)
+		return
+	}
+	if !s.rlTotpChallenge.allow(challengeID) {
+		tooMany(w, 30)
+		return
+	}
+
 	var challenge *twoFAChallenge
 	s.mu.Lock()
 	if ch, ok := s.challs[challengeID]; ok {
@@ -294,12 +323,18 @@ func (s *Server) handleLoginVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := s.users.FindByUsername(challenge.Username)
-	if err != nil {
-		s.clearChallenge(challengeID)
-		http.Error(w, "invalid challenge", http.StatusUnauthorized)
-		return
-	}
+    user, err := s.users.FindByUsername(challenge.Username)
+    if err != nil {
+        s.clearChallenge(challengeID)
+        http.Error(w, "invalid challenge", http.StatusUnauthorized)
+        return
+    }
+
+    // Also rate limit TOTP by username
+    if !s.rlTotpUser.allow(strings.ToLower(user.Username)) {
+        tooMany(w, 30)
+        return
+    }
 
     if !totp.Verify(code, user.TOTPSecret, time.Now().UTC()) {
         http.Error(w, "invalid code", http.StatusUnauthorized)
@@ -424,6 +459,21 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Rate limit by IP and identifier (email/username)
+	ip := getClientIP(r)
+	if !s.rlForgotIP.allow(ip) {
+		tooMany(w, 300)
+		return
+	}
+	ident := email
+	if ident == "" {
+		ident = strings.ToLower(username)
+	}
+	if ident != "" && !s.rlForgotID.allow(ident) {
+		tooMany(w, 300)
+		return
+	}
+
 	resp := forgotPasswordResp{
 		Note: "If the account exists, you'll receive a reset link shortly.",
 	}
@@ -485,10 +535,21 @@ func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "token and next password required", http.StatusBadRequest)
 		return
 	}
-	if err := validatePassword(next); err != nil {
-		http.Error(w, "weak password: "+err.Error(), http.StatusBadRequest)
-		return
-	}
+		if err := validatePassword(next); err != nil {
+			http.Error(w, "weak password: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Rate limit by IP and reset token
+		ip := getClientIP(r)
+		if !s.rlResetIP.allow(ip) {
+			tooMany(w, 300)
+			return
+		}
+		if !s.rlResetToken.allow(token) {
+			tooMany(w, 300)
+			return
+		}
 
 	s.mu.Lock()
 	info, ok := s.resets[token]

@@ -22,9 +22,7 @@ export default function NewItem() {
         <div className="section-header">
           <div>
             <h1 className="section-title">Add a new item</h1>
-            <p className="section-subtitle">
-              Store credentials, secret notes, or cards with zero-knowledge encryption.
-            </p>
+            <p className="section-subtitle">Store login credentials with zero-knowledge encryption.</p>
           </div>
           <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)}>
             <span aria-hidden="true">←</span>

@@ -17,6 +17,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/time/rate"
 )
 
 type Server struct {
@@ -34,6 +35,17 @@ type Server struct {
 
     // shared mongo client for vault storage to avoid repeated SRV lookups
     storageClient *mongo.Client
+
+    // rate limiters
+    rlLoginIP       *multiLimiter
+    rlLoginID       *multiLimiter
+    rlTotpIP        *multiLimiter
+    rlTotpChallenge *multiLimiter
+    rlTotpUser      *multiLimiter
+    rlForgotIP      *multiLimiter
+    rlForgotID      *multiLimiter
+    rlResetIP       *multiLimiter
+    rlResetToken    *multiLimiter
 }
 
 func New(ctx context.Context, cfg Config) (*Server, error) {
@@ -83,6 +95,23 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
         return nil, err
     }
     s.storageClient = sc
+
+    // Initialize rate limiters
+    // helper: per-second rate for n per window
+    perWindow := func(n int, window time.Duration) float64 { return float64(n) / window.Seconds() }
+    // Login: IP 10/min, ID 5/min
+    s.rlLoginIP = newMultiLimiter(rate.Limit(perWindow(10, time.Minute)), 10, 1*time.Hour)
+    s.rlLoginID = newMultiLimiter(rate.Limit(perWindow(5, time.Minute)), 5, 1*time.Hour)
+    // TOTP verify: IP 10/min, per challenge 3/min, per user 5/min
+    s.rlTotpIP = newMultiLimiter(rate.Limit(perWindow(10, time.Minute)), 10, 10*time.Minute)
+    s.rlTotpChallenge = newMultiLimiter(rate.Limit(perWindow(3, time.Minute)), 3, 10*time.Minute)
+    s.rlTotpUser = newMultiLimiter(rate.Limit(perWindow(5, time.Minute)), 5, 10*time.Minute)
+    // Password forgot: IP 5/15min, ID 3/15min
+    s.rlForgotIP = newMultiLimiter(rate.Limit(perWindow(5, 15*time.Minute)), 5, 30*time.Minute)
+    s.rlForgotID = newMultiLimiter(rate.Limit(perWindow(3, 15*time.Minute)), 3, 30*time.Minute)
+    // Password reset: IP 10/15min, per token 5/15min
+    s.rlResetIP = newMultiLimiter(rate.Limit(perWindow(10, 15*time.Minute)), 10, 30*time.Minute)
+    s.rlResetToken = newMultiLimiter(rate.Limit(perWindow(5, 15*time.Minute)), 5, 30*time.Minute)
 
 	if err := s.ensureSeedUsers(ctx); err != nil {
 		return nil, err

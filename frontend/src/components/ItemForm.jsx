@@ -29,8 +29,8 @@ export default function ItemForm({
   submitLabel = "Save",
   onDelete,
 }) {
-  const [type, setType] = useState((initial.type || "login").toLowerCase());
-  const kind = (type || "").toLowerCase();
+  // Force login-only items
+  const kind = "login";
 
   const [site, setSite] = useState(initial.fields?.site || initial.fields?.title || "");
   const [notes, setNotes] = useState(initial.fields?.notes || "");
@@ -45,66 +45,23 @@ export default function ItemForm({
   const [network, setNetwork] = useState(initial.fields?.network || "");
   const [err, setErr] = useState("");
 
-  const placeholderForSite = useMemo(
-    () => (kind === "login" ? "example.com" : "Optional display title"),
-    [kind]
-  );
+  const placeholderForSite = useMemo(() => "example.com", []);
 
   async function submit(e) {
     e.preventDefault();
     setErr("");
 
-    const payload = { type: kind, fields: {} };
+    const payload = { type: "login", fields: {} };
 
-    if (kind === "login") {
-      if (!site) return setErr("Please add a website or title for this login.");
-      payload.fields = { site, username, password, notes };
-    } else if (kind === "card") {
-      if (!cardholder) return setErr("Please enter the cardholder name.");
-      if (!cardNumber) return setErr("Please enter the card number.");
-      if (!luhnCheck(cardNumber)) return setErr("Card number failed the validity check.");
-      if (!expMonth || !expYear) return setErr("Please enter the expiration month and year.");
-      if (!cvv) return setErr("Please enter the CVV/CVC.");
-
-      const digits = digitsOnly(cardNumber);
-      const last4 = digits.slice(-4);
-
-      payload.fields = {
-        cardholder,
-        number: digits,
-        exp_month: expMonth,
-        exp_year: expYear,
-        cvv,
-        network,
-        notes,
-        site: site || (last4 ? `Card •••• ${last4}` : "Card"),
-      };
-    } else if (kind === "note") {
-      payload.fields = { site, notes };
-    } else {
-      payload.fields = { site, notes };
-    }
+    if (!site) return setErr("Please add a website or title for this login.");
+    payload.fields = { site, username, password, notes };
 
     await onSubmit(payload);
   }
 
   return (
     <form className="form-card" onSubmit={submit}>
-      <div className="form-field">
-        <label className="input-label" htmlFor="item-type">
-          Item type
-        </label>
-        <select
-          id="item-type"
-          className="select"
-          value={kind}
-          onChange={(e) => setType((e.target.value || "").toLowerCase())}
-        >
-          <option value="login">Login</option>
-          <option value="note">Secure note</option>
-          <option value="card">Card</option>
-        </select>
-      </div>
+      {/* Item type removed: login-only */}
 
       <div className="form-field">
         <label className="input-label" htmlFor="item-site">
@@ -119,7 +76,7 @@ export default function ItemForm({
         />
       </div>
 
-      {kind === "login" && (
+      {
         <>
           <div className="form-row">
             <div className="form-field">
@@ -159,95 +116,9 @@ export default function ItemForm({
             </div>
           </div>
         </>
-      )}
+      }
 
-      {kind === "card" && (
-        <>
-          <div className="form-field">
-            <label className="input-label" htmlFor="card-holder">
-              Cardholder
-            </label>
-            <input
-              id="card-holder"
-              className="input"
-              placeholder="Full name as it appears on the card"
-              value={cardholder}
-              onChange={(e) => setCardholder(e.target.value)}
-            />
-          </div>
-
-          <div className="form-field">
-            <label className="input-label" htmlFor="card-number">
-              Card number
-            </label>
-            <input
-              id="card-number"
-              className="input"
-              placeholder="1234 5678 9012 3456"
-              value={cardNumber}
-              onChange={(e) => setCardNumber(e.target.value)}
-              inputMode="numeric"
-              autoComplete="cc-number"
-            />
-          </div>
-
-          <div className="form-row">
-            <div className="form-field">
-              <label className="input-label" htmlFor="card-exp-month">
-                Exp. month
-              </label>
-              <input
-                id="card-exp-month"
-                className="input"
-                placeholder="MM"
-                value={expMonth}
-                onChange={(e) => setExpMonth(e.target.value)}
-                autoComplete="cc-exp-month"
-              />
-            </div>
-            <div className="form-field">
-              <label className="input-label" htmlFor="card-exp-year">
-                Exp. year
-              </label>
-              <input
-                id="card-exp-year"
-                className="input"
-                placeholder="YY or YYYY"
-                value={expYear}
-                onChange={(e) => setExpYear(e.target.value)}
-                autoComplete="cc-exp-year"
-              />
-            </div>
-            <div className="form-field">
-              <label className="input-label" htmlFor="card-cvv">
-                CVV
-              </label>
-              <input
-                id="card-cvv"
-                className="input"
-                placeholder="CVV"
-                value={cvv}
-                onChange={(e) => setCvv(e.target.value)}
-                inputMode="numeric"
-                autoComplete="cc-csc"
-              />
-            </div>
-          </div>
-
-          <div className="form-field">
-            <label className="input-label" htmlFor="card-network">
-              Network
-            </label>
-            <input
-              id="card-network"
-              className="input"
-              placeholder="Visa / Mastercard / Amex"
-              value={network}
-              onChange={(e) => setNetwork(e.target.value)}
-            />
-          </div>
-        </>
-      )}
+      {/* Card and Secure note inputs removed (login-only) */}
 
       <div className="form-field">
         <label className="input-label" htmlFor="item-notes">

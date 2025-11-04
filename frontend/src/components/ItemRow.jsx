@@ -6,33 +6,17 @@ function last4Digits(s) {
   return d.slice(-4);
 }
 
-function resolveBadge(type) {
-  if (type === "card") return { className: "badge badge--card", label: "Card" };
-  if (type === "note" || type === "secure note" || type === "secure-note") {
-    return { className: "badge badge--note", label: "Secure note" };
-  }
+function resolveBadge() {
   return { className: "badge badge--login", label: "Login" };
 }
 
 export default function ItemRow({ item }) {
   const f = item?.fields || {};
-  const tRaw = (item?.type || "login").toLowerCase();
-  const badge = resolveBadge(tRaw);
+  const badge = resolveBadge();
 
   let title = f.site || f.title || f.name || "(untitled)";
   let subtitle = f.username || f.user || "";
-  let icon = "🔑";
-
-  if (tRaw === "card") {
-    icon = "💳";
-    const l4 = last4Digits(f.number);
-    const holder = f.cardholder || "Card";
-    title = l4 ? `${holder} · •••• ${l4}` : holder;
-    subtitle = f.network || "Credit card";
-  } else if (tRaw === "note" || tRaw === "secure note" || tRaw === "secure-note") {
-    icon = "📝";
-    subtitle = f.notes ? `${(f.notes || "").slice(0, 42)}${f.notes.length > 42 ? "…" : ""}` : "Private note";
-  }
+  const icon = "🔑";
 
   const updatedAt = item?.updated_at ? new Date(item.updated_at) : null;
   const timestamp = updatedAt ? updatedAt.toLocaleDateString() : "";

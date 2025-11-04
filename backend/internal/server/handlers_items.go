@@ -9,16 +9,16 @@ import (
 )
 
 func (s *Server) handleItems(w http.ResponseWriter, r *http.Request) {
-	v, err := s.withSessionVault(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+    v, err := s.withSessionVault(r)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusUnauthorized)
+        return
+    }
 
-	switch r.Method {
-	case http.MethodGet:
-		typ := r.URL.Query().Get("type")
-		q := vault.Query{Type: typ}
+    switch r.Method {
+    case http.MethodGet:
+        // Only expose login items (passwords) in this build
+        q := vault.Query{Type: "login"}
 
 		metas, err := v.List(r.Context(), q)
 		if err != nil {
@@ -77,15 +77,20 @@ func (s *Server) handleItems(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "bad json", http.StatusBadRequest)
 			return
 		}
-		if strings.TrimSpace(it.Type) == "" {
-			http.Error(w, "type required", http.StatusBadRequest)
-			return
-		}
-		if it.Fields == nil || strings.TrimSpace(it.Fields["password"]) == "" {
-			http.Error(w, "fields.password required", http.StatusBadRequest)
-			return
-		}
-		id, err := v.AddItem(r.Context(), it)
+        // Only allow login items (passwords)
+        it.Type = strings.ToLower(strings.TrimSpace(it.Type))
+        if it.Type == "" {
+            it.Type = "login"
+        }
+        if it.Type != "login" {
+            http.Error(w, "only login items are supported", http.StatusBadRequest)
+            return
+        }
+        if it.Fields == nil || strings.TrimSpace(it.Fields["password"]) == "" {
+            http.Error(w, "fields.password required", http.StatusBadRequest)
+            return
+        }
+        id, err := v.AddItem(r.Context(), it)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -119,17 +124,23 @@ func (s *Server) handleItemByID(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, it)
 
-	case http.MethodPut:
-		var patch vault.Item
-		if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
-			http.Error(w, "bad json", http.StatusBadRequest)
-			return
-		}
-		if err := v.UpdateItem(r.Context(), id, patch); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		writeJSON(w, map[string]any{"updated": true})
+case http.MethodPut:
+        var patch vault.Item
+        if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
+            http.Error(w, "bad json", http.StatusBadRequest)
+            return
+        }
+        // Enforce login type only if provided
+        pt := strings.ToLower(strings.TrimSpace(patch.Type))
+        if pt != "" && pt != "login" {
+            http.Error(w, "only login items are supported", http.StatusBadRequest)
+            return
+        }
+        if err := v.UpdateItem(r.Context(), id, patch); err != nil {
+            http.Error(w, err.Error(), http.StatusBadRequest)
+            return
+        }
+        writeJSON(w, map[string]any{"updated": true})
 
 	case http.MethodDelete:
 		if err := v.DeleteItem(r.Context(), id); err != nil {

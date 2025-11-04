@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"regexp"
 	"strings"
 
@@ -21,6 +22,13 @@ func writeJSONStatus(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+func tooMany(w http.ResponseWriter, retryAfterSeconds int) {
+    if retryAfterSeconds > 0 {
+        w.Header().Set("Retry-After", strconv.Itoa(retryAfterSeconds))
+    }
+    http.Error(w, "too many requests", http.StatusTooManyRequests)
 }
 
 var (
